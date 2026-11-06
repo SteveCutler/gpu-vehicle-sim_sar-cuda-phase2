@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
-project(gpu_vehicle_sim LANGUAGES CXX)
+project(gpu_vehicle_sim LANGUAGES CXX CUDA)
 
-option(ENABLE_RENDERER "Build the SFML renderer" ON)
+find_package(CUDAToolkit REQUIRED)
+
+option(ENABLE_RENDERER "Build the SFML renderer" OFF)
 
 find_package(SFML 3 REQUIRED COMPONENTS Graphics Window System)
 
@@ -17,6 +19,7 @@ SFML::System
 PRIVATE
     SFML::Graphics
     SFML::Window
+    CUDA::cudart
 )
 
 
@@ -39,7 +42,17 @@ add_executable(vehicle_sim
     src/vehicle/SearchPlanner.cpp
 )
 
-target_link_libraries(vehicle_sim PRIVATE fluid_core)
+target_link_libraries(vehicle_sim 
+PRIVATE 
+fluid_core
+CUDA::cudart
+)
+
+set_target_properties(vehicle_sim fluid_core PROPERTIES
+    CUDA_STANDARD 17
+    CUDA_STANDARD_REQUIRED ON
+    CUDA_SEPARABLE_COMPILATION ON
+)
 
 # Optional rendering and UI.
 if(ENABLE_RENDERER)
