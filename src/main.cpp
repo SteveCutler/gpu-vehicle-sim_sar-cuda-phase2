@@ -12,6 +12,7 @@
 #include "vehicle/ProbabilityMap.hpp"
 #include "vehicle/SearchPlanner.hpp"
 
+
 //Fluid Include
 #include <iostream>
 #include <SFML/Window.hpp>
@@ -28,6 +29,10 @@
 #include "vehicle/renderer.hpp"
 #endif
 
+#ifdef ENABLE_CUDA
+#include "CUDA_simulation.hpp"
+#endif
+
 using Clock = std::chrono::steady_clock;
 
 int main(int argNum, char* argVals[]){
@@ -40,6 +45,15 @@ int main(int argNum, char* argVals[]){
     constexpr float dt = 0.02f;
     constexpr bool arrow_viz = false;
     constexpr std::size_t seed = 42;
+
+
+    //CUDA SETTINGS
+    bool useCuda = false;
+
+    #ifdef ENABLE_CUDA
+        useCuda = true;
+
+    #endif
 
      ////////////
     //FLUID INIT
@@ -134,83 +148,98 @@ int main(int argNum, char* argVals[]){
         Renderer renderer(width, height, arrow_viz, cell_size);
     #endif
 
+    #ifdef
+        CUDA_simulation CudaSim(planner, target, p_map, env, N, dt);
+        CudaSim.init_simulation(
+            vehicles
+        )
+    #endif
+
 
         //start wallclock timer for performance measurement
         const auto start = Clock::now();
 
         //run sim for steps amount of steps
-        while(curr_step < steps){
+        if(useCuda){
+                //move work to GPU
+                #ifdef ENABLE_CUDA
+                   CudaSim.runCudaSimulation();
+                #endif
+            }
+        else{
+            while(curr_step < steps){
 
-            //FLUID UPDATE
-
-            if(target_found){break;}
-
-            
-
-
-            //VEHICLE UPDATE
-            //loop over every vehicle every step
-            for(int x = 0; x < N; x++){
-                //load vehicle state
-                vs = vehicles.load(x);
-    
-                //pass to controller 
-                
-                // must write controller logic still
-                action = controller.steer_controller(vs);
-
-                //calculate new state
-                newState = dynamics.step_update(vs, action, env, dt, curr_step);
-
-                //scan for goal/kill particles
-                target_found = vehicles.scan(newState, p_map, target);
+                //FLUID UPDATE
 
                 if(target_found){break;}
 
-                //run planner every 50 steps
-                if(curr_step % 50 == 0 && curr_step != 0){
-                    //choose waypoint based on particle drift predictions
-                    
-                    std::pair<float,float> newWP = planner.chooseWaypoint(vs, 
-                        p_map.particles_, 
-                        env, 
-                        dt, 
-                        tempMap,
-                        dynamics,
-                        controller,
-                        height);
-                    //update waypoint
-                    newState.goalx = newWP.first;
-                    newState.goaly = newWP.second;
 
-                   // std::cout << "Updating WP to: {" << newState.goalx << ", " << newState.goaly << "}" << std::endl;
-
-                    
-                }
                 
-                //update old state
-                vehicles.set(x, newState);
 
-            }
-
-            //update target location
-            driftDynamics.DriftUpdate(target, env.getDisturbance(target.x, target.y, 0.0f), dt);
-
-            //update probability particles
-            p_map.update(env, dt);
-
-            //compute probability
-            p_map.computeProb();
-
-            env.update_fluid(dt);
-
-        //optionally display data
-        #ifdef ENABLE_RENDERER
-            bool running = renderer.draw(vehicles, dt, curr_step, env, target, p_map);
-            if(!running) {
-                break;
-            }
-        #endif
+                    //VEHICLE UPDATE
+                    //loop over every vehicle every step
+                    for(int x = 0; x < N; x++){
+                        //load vehicle state
+                        vs = vehicles.load(x);
+            
+                        //pass to controller 
+                        
+                        // must write controller logic still
+                        action = controller.steer_controller(vs);
+        
+                        //calculate new state
+                        newState = dynamics.step_update(vs, action, env, dt, curr_step);
+        
+                        //scan for goal/kill particles
+                        target_found = vehicles.scan(newState, p_map, target);
+        
+                        if(target_found){break;}
+        
+                        //run planner every 50 steps
+                        if(curr_step % 50 == 0 && curr_step != 0){
+                            //choose waypoint based on particle drift predictions
+                            
+                            std::pair<float,float> newWP = planner.chooseWaypoint(vs, 
+                                p_map.particles_, 
+                                env, 
+                                dt, 
+                                tempMap,
+                                dynamics,
+                                controller,
+                                height);
+                            //update waypoint
+                            newState.goalx = newWP.first;
+                            newState.goaly = newWP.second;
+        
+                        // std::cout << "Updating WP to: {" << newState.goalx << ", " << newState.goaly << "}" << std::endl;
+        
+                            
+                        }
+                        
+                        //update old state
+                        vehicles.set(x, newState);
+        
+                    }
+        
+                    //update target location
+                    driftDynamics.DriftUpdate(target, env.getDisturbance(target.x, target.y, 0.0f), dt);
+        
+                    //update probability particles
+                    p_map.update(env, dt);
+        
+                    //compute probability
+                    p_map.computeProb();
+        
+                    env.update_fluid(dt);
+        
+                //optionally display data
+                #ifdef ENABLE_RENDERER
+                    bool running = renderer.draw(vehicles, dt, curr_step, env, target, p_map);
+                    if(!running) {
+                        break;
+                    }
+                #endif
+                }
 
 
         //increment step counter

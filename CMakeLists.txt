@@ -53,16 +53,30 @@ fluid_core
 )
 
 if(ENABLE_CUDA)
+
+    target_sources(fluid_core PRIVATE
+        src/fluid/FluidGrid.cu
+
+    )
+    target_sources(vehicle_sim PRIVATE
+        src/vehicle/ProbabilityMap.cu
+        src/vehicle/SearchPlanner.cu
+        src/CUDA_simulation.cu
+    )
+
     target_link_libraries(fluid_core PRIVATE CUDA::cudart)
     target_link_libraries(vehicle_sim PRIVATE CUDA::cudart)
 
-    set_target_properties(vehicle_sim fluid_core PROPERTIES
+    # Allow #ifdef ENABLE_CUDA in each target's source files.
+    target_compile_definitions(fluid_core PRIVATE ENABLE_CUDA)
+    target_compile_definitions(vehicle_sim PRIVATE ENABLE_CUDA)
+
+    set_target_properties(fluid_core vehicle_sim PROPERTIES
         CUDA_STANDARD 17
         CUDA_STANDARD_REQUIRED ON
         CUDA_SEPARABLE_COMPILATION ON
     )
 endif()
-
 
 
 # Optional rendering and UI.
