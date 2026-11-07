@@ -67,7 +67,7 @@ int main(int argNum, char* argVals[]){
     // }
 
     //Vehicles
-    std::size_t N = 1;
+    std::size_t N = 2;
     //Steps
     std::size_t steps = -1;
 
@@ -83,9 +83,14 @@ int main(int argNum, char* argVals[]){
     
     //initialize environment with 0 wind at first
     environment env(width, height, emitters, seed);
-    
+
+    //target initialization
+    DriftItem target;
+    target.x = static_cast<float>(width/2.0f);
+    target.y = static_cast<float>(height*0.8f);
+
     //initialize vehicleState data
-    vehicleBatch vehicles(N, env);
+    vehicleBatch vehicles(N, env, target.x, height - target.y);
     
     //create controller object
     Controller controller;
@@ -95,15 +100,12 @@ int main(int argNum, char* argVals[]){
     //Drift dynamics
     DriftDynamics driftDynamics;
 
-    //target initialization
-    DriftItem target;
-    target.x = static_cast<float>(width/2.0f);
-    target.y = static_cast<float>(height*0.8f);
-
     //init Probability Map
     float prob_rad = 25.f;
-    std::size_t particle_count = 1000;
+    std::size_t particle_count = 10000;
     std::size_t cell_size = 50;
+
+    //convert target spawn location to cell to initialize vehicles to target last known location of object
 
     ProbabilityMap p_map(driftDynamics, width, height, particle_count, target.x, target.y, prob_rad, cell_size);
     //used for calculating future waypoints

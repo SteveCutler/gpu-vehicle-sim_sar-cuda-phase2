@@ -1,1 +1,10 @@
-# CUDA Implementation - Vehicle Search & Rescue project, Phase 2
+# Serial Implementation for later CUDA Porting
+
+TO DO:
+
+-color code goals and vehicles together
+-shrink vehicle size
+-implement some measurment of error mechanism to compare GPU version against
+-create a CPU benchmark
+
+For multiple vehicles need to fix spawn positions to not spawn near target

@@ -2,7 +2,7 @@
 #include <random>
 
 
-vehicleBatch::vehicleBatch(std::size_t N, environment env):
+vehicleBatch::vehicleBatch(std::size_t N, environment env, float goal_x, float goal_y ):
     m_x(N),
     m_y(N),
     m_vx(N),
@@ -12,7 +12,9 @@ vehicleBatch::vehicleBatch(std::size_t N, environment env):
     m_goalx(N),
     m_goaly(N),
     m_size(N),
-    m_sensor_rad(N)
+    m_sensor_rad(N),
+    init_goalx(goal_x),
+    init_goaly(goal_y)
 {
 
     //RNG setup 
@@ -25,7 +27,7 @@ vehicleBatch::vehicleBatch(std::size_t N, environment env):
         margin, static_cast<float>(env.m_width) - margin);
 
     std::uniform_real_distribution<float> randomY(
-        margin, static_cast<float>(env.m_height) - margin);
+        margin, static_cast<float>(env.m_height) - static_cast<float>(env.m_height)*.5);
 
     std::uniform_real_distribution<float> randomHeading(-pi, pi);
 
@@ -41,8 +43,8 @@ vehicleBatch::vehicleBatch(std::size_t N, environment env):
         m_heading[x] = randomHeading(rng);
         m_turnRate[x] = 0.f;
 
-        m_goalx[x] = randomX(rng);
-        m_goaly[x] = randomY(rng);
+        m_goalx[x] = init_goalx;
+        m_goaly[x] = init_goaly;
         
         m_sensor_rad[x] = 10.f;
         
@@ -99,12 +101,12 @@ bool vehicleBatch::scan(VehicleState& vs, ProbabilityMap& p_map, DriftItem& targ
         return true;
     }
 
-    //removing function to update waypoint
-    // if(goal_dist < vs.sensor_rad*2){
 
-    //     p_map.updateGoal(vs);
+    if(goal_dist < vs.sensor_rad*2){
+
+        p_map.updateGoal(vs);
         
-    // }
+    }
 
     p_map.particleScan(vs);
 
