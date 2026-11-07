@@ -149,11 +149,11 @@ int main(int argNum, char* argVals[]){
         Renderer renderer(width, height, arrow_viz, cell_size);
     #endif
 
-    #ifdef
+    #ifdef ENABLE_CUDA
         CUDA_simulation CudaSim(planner, target, p_map, tempMap, env, N, dt);
         CudaSim.init_simulation(
             vehicles
-        )
+        );
     #endif
 
 
@@ -240,11 +240,11 @@ int main(int argNum, char* argVals[]){
                         break;
                     }
                 #endif
+                
+                        //increment step counter
+                        curr_step++;
                 }
 
-
-        //increment step counter
-        curr_step++;
         }
 
         //end clock
