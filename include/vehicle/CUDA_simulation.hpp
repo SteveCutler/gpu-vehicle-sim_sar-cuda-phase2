@@ -1,31 +1,47 @@
 #pragma once
 #include <cstddef>
+#include <cuda_runtime.h>
 #include "vehicleBatch.hpp"
-#include "environment.hpp"
-#include "ProbabilityMap.hpp"
-#include "vehicle/controller.hpp"
-#include "vehicle/dynamics.hpp"
+#include "environment_CUDA.hpp"
+#include "ProbabilityMap_CUDA.hpp"
+#include "vehicle/controller_CUDA.hpp"
+#include "vehicle/dynamics_CUDA.hpp"
 #include "vehicle/vehicleTypes.hpp"
-#include "SearchPlanner.hpp"
+#include "SearchPlanner_CUDA.hpp"
 
 
 class CUDA_simulation
 {
 public:
-    CudaSimulation(SearchPlanner& planner, 
+    CUDA_simulation(SearchPlanner& planner, 
         DriftItem& target, 
         ProbabilityMap& p_map,
+        ProbabilityMap& temp_map,
         environment& env,
         std::size_t N,
         float dt):
-    planner_(planner),
-    target_(target),
-    p_map_(p_map),
-    env_(env),
-    N_(N),
-    dt_(dt)
-    {};
-private:
+        planner_(planner),
+        target_(target),
+        p_map_(p_map),
+        temp_map_(temp_map),
+        env_(env),
+        v_count_(N),
+        dt_(dt)
+        {};
+    
+    CUDA_simulation(const CUDA_simulation&) = delete;
+    CUDA_simulation& operator=(const CUDA_simulation&) = delete;
+
+    ~CUDA_simulation();
+
+    void runCudaSimulation(vehicleBatch& vehicles, std::size_t steps);
+    void init_simulation(vehicleBatch& vehicles);
+    void HtD_vehicles(const vehicleBatch& vehicles);
+    void DtH_vehicles(vehicleBatch& vehicles);
+    void step_vehicles();
+    
+    void HtD_fluid();
+    void DtH_fluid();
 
     //init objects
     Controller controller;
@@ -36,7 +52,12 @@ private:
     SearchPlanner& planner_;
     DriftItem& target_;
     ProbabilityMap& p_map_;
+    ProbabilityMap& temp_map_;
     environment& env_;
+
+
+private:
+
 
 
     //vehicle pointer vars
@@ -56,26 +77,8 @@ private:
     float* d_v_prev_ = nullptr;
 
     std::size_t cell_count_ = 0;
-    std::size_t N_;
+    std::size_t v_count_;
     float dt_;
-
-    CudaSimulation(const CudaSimulation&) = delete;
-    CudaSimulation& operator=(const CudaSimulation&) = delete;
-
-    ~CUDA_simulation();
-
-    void runCudaSimuation(
-        std::size_t steps
-    );
-    
-    void init_simulation(
-        vehicleBatch& vehicles
-    );
-
-    void allocate_vehicles();
-    void step_vehicles();
-
-    __global__ void updateVehicles();
 
 };
 

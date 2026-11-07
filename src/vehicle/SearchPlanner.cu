@@ -1,6 +1,7 @@
 #include "vehicle/SearchPlanner.hpp"
 #include "vehicle/vehicleTypes.hpp"
 #include <vector>
+#include <cuda_runtime.h>
 #include <set>
 #include <algorithm>
 

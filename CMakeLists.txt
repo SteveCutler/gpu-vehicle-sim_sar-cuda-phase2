@@ -61,6 +61,8 @@ if(ENABLE_CUDA)
     target_sources(vehicle_sim PRIVATE
         src/vehicle/ProbabilityMap.cu
         src/vehicle/SearchPlanner.cu
+        src/vehicle/controller.cu
+        src/vehicle/dynamics.cu
         src/CUDA_simulation.cu
     )
 

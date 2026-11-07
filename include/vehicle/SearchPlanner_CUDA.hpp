@@ -4,6 +4,7 @@
 #include "vehicle/environment.hpp"
 #include "vehicle/dynamics.hpp"
 #include "vehicle/controller.hpp"
+#include <cuda_runtime.h>
 #include <vector>
 
 class SearchPlanner

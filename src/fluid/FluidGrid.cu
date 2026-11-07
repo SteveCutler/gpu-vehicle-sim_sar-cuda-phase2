@@ -5,6 +5,7 @@
 #include <thread>
 #include <algorithm>
 #include <cmath>
+#include <cuda_runtime.h>
 #include <SFML/System/Time.hpp>
 
 

@@ -1,8 +1,10 @@
 #include "vehicle/ProbabilityMap.hpp"
+#include "vehicle/ProbabilityMap_CUDA.hpp"
 #include <vector>
 #include <random>
 #include <algorithm>
 #include "vehicle/DriftDynamics.hpp"
+#include <cuda_runtime.h>
 
 ProbabilityMap::ProbabilityMap(DriftDynamics& DD, ::size_t width, std::size_t height, std::size_t num_p, float est_x, float est_y, float p_rad, std::size_t cell_size):
 width_(width),

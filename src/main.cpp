@@ -30,6 +30,7 @@
 #endif
 
 #ifdef ENABLE_CUDA
+#include <cuda_runtime.h>
 #include "CUDA_simulation.hpp"
 #endif
 
@@ -149,7 +150,7 @@ int main(int argNum, char* argVals[]){
     #endif
 
     #ifdef
-        CUDA_simulation CudaSim(planner, target, p_map, env, N, dt);
+        CUDA_simulation CudaSim(planner, target, p_map, tempMap, env, N, dt);
         CudaSim.init_simulation(
             vehicles
         )
