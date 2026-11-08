@@ -29,7 +29,7 @@
 
 #ifdef ENABLE_CUDA
 #include <cuda_runtime.h>
-#include "CUDA_simulation.hpp"
+#include "vehicle/CUDA_simulation.hpp"
 #endif
 
 using Clock = std::chrono::steady_clock;

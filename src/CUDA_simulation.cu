@@ -1,5 +1,5 @@
 #include <cuda_runtime.h>
-#include "CUDA_simulation.hpp"
+#include "vehicle/CUDA_simulation.hpp"
 #include <cuda/std/utility>
 #include "vehicle/environment_CUDA.hpp"
 #include "vehicle/controller_CUDA.hpp"
@@ -11,6 +11,7 @@
 #include "SearchPlanner.hpp"
 #include "vehicle/controller.hpp"
 #include "vehicle/dynamics.hpp"
+
 
 
 #include <iostream>
