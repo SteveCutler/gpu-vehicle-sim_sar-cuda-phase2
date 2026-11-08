@@ -5,7 +5,6 @@
 #include "vehicle/controller_CUDA.hpp"
 #include "vehicle/dynamics_CUDA.hpp"
 #include "vehicle/vehicleTypes.hpp"
-#include "vehicle/environment.hpp"
 
 #include "vehicle/SearchPlanner_CUDA.hpp"
 #include "vehicle/controller.hpp"

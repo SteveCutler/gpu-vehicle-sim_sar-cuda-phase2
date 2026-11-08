@@ -17,7 +17,7 @@ public:
         DriftItem& target, 
         ProbabilityMap_CUDA& p_map,
         ProbabilityMap_CUDA& temp_map,
-        environment& env,
+        environment_CUDA& env,
         std::size_t N,
         float dt):
         planner_(planner),
@@ -53,7 +53,7 @@ public:
     DriftItem& target_;
     ProbabilityMap_CUDA& p_map_;
     ProbabilityMap_CUDA& temp_map_;
-    environment& env_;
+    environment_CUDA& env_;
 
 
 private:
