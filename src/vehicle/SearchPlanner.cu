@@ -18,8 +18,8 @@ std::pair<float,float> SearchPlanner_CUDA::chooseWaypoint(VehicleState vs,
     const environment& env, 
     const float dt,
     ProbabilityMap& tempMap,
-    DynamicsCUDA& dynamics,
-    ControllerCUDA& controller,
+    DynamicsCuda& dynamics,
+    ControllerCuda& controller,
     std::size_t height_){
         //push back current waypoint as a candidate
         wayPoints.push_back({vs.goalx,vs.goaly});
