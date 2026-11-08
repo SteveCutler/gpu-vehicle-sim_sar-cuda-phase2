@@ -13,7 +13,7 @@
 class CUDA_simulation
 {
 public:
-    CUDA_simulation(SearchPlanner& planner, 
+    CUDA_simulation(SearchPlanner_CUDA& planner, 
         DriftItem& target, 
         ProbabilityMap& p_map,
         ProbabilityMap& temp_map,
