@@ -44,8 +44,8 @@ public:
     void DtH_fluid();
 
     //init objects
-    Controller controller;
-    Dynamics dynamics;
+    ControllerCuda controller;
+    DynamicsCuda dynamics;
     VehicleState vs{};
     Action action{};
     VehicleState newState{};

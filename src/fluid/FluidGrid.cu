@@ -243,9 +243,9 @@ float FluidGrid_CUDA::divergenceAt(std::size_t x, std::size_t y) const{
 }
 
 //measure divergence loop for test purposes
-DivergenceStats FluidGrid_CUDA::measureDivergence() const{
+DivergenceStats_CUDA FluidGrid_CUDA::measureDivergence() const{
 
-    DivergenceStats stats;
+    DivergenceStats_CUDA stats;
 
     double squaredSum = 0.0;
     std::size_t sampleCount = 0;

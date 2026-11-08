@@ -13,7 +13,7 @@
 
 
 //Divergence measurement test struct
-struct DivergenceStats {
+struct DivergenceStats_CUDA {
     double rms =0.0;
     double maximumAbsolute = 0.0;
     bool allFinite = true;
@@ -100,7 +100,7 @@ class FluidGrid_CUDA
         void setVelocityAt(std::size_t x, std::size_t y, float u,float v);
 
         //divergence stats test capture function
-        [[nodiscard]] DivergenceStats measureDivergence() const;
+        [[nodiscard]] DivergenceStats_CUDA measureDivergence() const;
 
         //moved to public for divergence test purposes
         void projectStep();

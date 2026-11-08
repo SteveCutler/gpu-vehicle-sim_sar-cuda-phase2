@@ -6,7 +6,7 @@
 #include "vehicle/DriftDynamics.hpp"
 #include <cuda_runtime.h>
 
-ProbabilityMap::ProbabilityMap(DriftDynamics& DD, std::size_t width, std::size_t height, std::size_t num_p, float est_x, float est_y, float p_rad, std::size_t cell_size):
+ProbabilityMap_CUDA::ProbabilityMap_CUDA(DriftDynamics& DD, std::size_t width, std::size_t height, std::size_t num_p, float est_x, float est_y, float p_rad, std::size_t cell_size):
 width_(width),
 height_(height),
 num_p_(num_p),
@@ -26,7 +26,7 @@ add_Particles();
 
 };
 
-void ProbabilityMap::update(const environment_CUDA& env, float dt){
+void ProbabilityMap_CUDA::update(const environment_CUDA& env, float dt){
 
    // add_Particles();
 
@@ -45,7 +45,7 @@ void ProbabilityMap::update(const environment_CUDA& env, float dt){
 
 
 };
-void ProbabilityMap::updateGoal(VehicleState& vs){
+void ProbabilityMap_CUDA::updateGoal(VehicleState& vs){
     std::size_t cols = width_ / cell_size_;
 
     std::size_t col = target_cell % cols;
@@ -58,7 +58,7 @@ void ProbabilityMap::updateGoal(VehicleState& vs){
 };
 
 
-std::pair<float,float> ProbabilityMap::convertCell(std::size_t cell){
+std::pair<float,float> ProbabilityMap_CUDA::convertCell(std::size_t cell){
         std::size_t cols = width_ / cell_size_;
 
     std::size_t col = cell % cols;
@@ -70,7 +70,7 @@ std::pair<float,float> ProbabilityMap::convertCell(std::size_t cell){
 
 }
 
-void ProbabilityMap::particleScan(VehicleState& vs){
+void ProbabilityMap_CUDA::particleScan(VehicleState& vs){
 
     for(auto it = particles_.begin(); it < particles_.end();){
         float x_pos = it->pos.x;
@@ -90,7 +90,7 @@ void ProbabilityMap::particleScan(VehicleState& vs){
     //std::cout << "particle scan" << std::endl;
 }
 
-void ProbabilityMap::add_Particles(){
+void ProbabilityMap_CUDA::add_Particles(){
     //adding particles
 
     constexpr float margin = 5.f;
@@ -111,7 +111,7 @@ void ProbabilityMap::add_Particles(){
     };
 }
 
-void ProbabilityMap::computeProb(){
+void ProbabilityMap_CUDA::computeProb(){
     //clear map from last frame
     std::fill(map_.begin(), map_.end(), 0.0f);
     //clear previous frames' occupied cell list
@@ -135,14 +135,14 @@ void ProbabilityMap::computeProb(){
             //add new cell to occupied cells list
             if(map_[cell_index] == 0.f){
                 occupied_cells.push_back(cell_index);
-            }
+            };
 
             //add particle to cell map
             map_[cell_index] += 1.0f; 
                 //change target cell if new update pushes cell to high probability than old target cell
                 if(map_[cell_index] > map_[target_cell]){
                     target_cell = cell_index;
-                }
+                };
                 //std::cout << "target cell is: " << target_cell << std::endl;
 
         }
