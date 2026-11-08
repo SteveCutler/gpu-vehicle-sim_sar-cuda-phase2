@@ -30,6 +30,8 @@
 #ifdef ENABLE_CUDA
 #include <cuda_runtime.h>
 #include "vehicle/ProbabilityMap_CUDA.hpp"
+#include "vehicle/environment_CUDA.hpp"
+#include "vehicle/vehicleBatch_CUDA.hpp"
 #include "vehicle/SearchPlanner_CUDA.hpp"
 #include "vehicle/CUDA_simulation.hpp"
 #endif
@@ -151,13 +153,13 @@ int main(int argNum, char* argVals[]){
 
     #ifdef ENABLE_CUDA
         vehicleBatch_CUDA vehicles_cuda(N, env, target.x, height - target.y);
-
+        environment_CUDA env_cuda(width, height, emitters, seed);
         SearchPlanner_CUDA planner_cuda(50);
         ProbabilityMap_CUDA p_map_cuda(driftDynamics, width, height, particle_count, target.x, target.y, prob_rad, cell_size);
         ProbabilityMap_CUDA tempMap_cuda(driftDynamics, width, height, particle_count, target.x, target.y, prob_rad, cell_size);
-        CUDA_simulation CudaSim(planner_cuda, target, p_map_cuda, tempMap_cuda, env, N, dt);
+        CUDA_simulation CudaSim(planner_cuda, target, p_map_cuda, tempMap_cuda, env_cuda, N, dt);
         CudaSim.init_simulation(
-            vehicles
+            vehicles_cuda
         );
     #endif
 
