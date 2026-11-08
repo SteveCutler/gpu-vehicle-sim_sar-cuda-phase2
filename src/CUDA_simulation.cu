@@ -6,7 +6,7 @@
 #include "vehicle/dynamics_CUDA.hpp"
 #include "vehicle/vehicleTypes.hpp"
 #include "vehicle/vehicleBatch.hpp"
-#include "environment.hpp"
+#include "vehicle/environment.hpp"
 #include "ProbabilityMap.hpp"
 #include "SearchPlanner_CUDA.hpp"
 #include "vehicle/controller.hpp"

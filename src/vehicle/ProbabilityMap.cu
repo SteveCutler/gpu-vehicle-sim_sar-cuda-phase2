@@ -104,9 +104,6 @@ void ProbabilityMap::add_Particles(){
     std::uniform_real_distribution<float> randomY(min_y + margin, max_y - margin);
     std::uniform_real_distribution<float> randomLife(50.f, 100.f);
 
-    float x;
-    float y;
-
     for(size_t i = 0; i < num_p_; i++){
         particles_.push_back( 
             PredictionParticle(randomX(rng_), randomY(rng_), randomLife(rng_)) 
@@ -121,7 +118,6 @@ void ProbabilityMap::computeProb(){
     occupied_cells.clear();
 
     //calculate width of cells
-    std::size_t rows = height_ / cell_size_;
     std::size_t cols = width_ / cell_size_;
 
 

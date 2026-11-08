@@ -2,12 +2,12 @@
 #include <cstddef>
 #include <cuda_runtime.h>
 #include "vehicleBatch.hpp"
-#include "environment_CUDA.hpp"
-#include "ProbabilityMap_CUDA.hpp"
+#include "vehicle/environment_CUDA.hpp"
+#include "vehicle/ProbabilityMap_CUDA.hpp"
 #include "vehicle/controller_CUDA.hpp"
 #include "vehicle/dynamics_CUDA.hpp"
 #include "vehicle/vehicleTypes.hpp"
-#include "SearchPlanner_CUDA.hpp"
+#include "vehicle/SearchPlanner_CUDA.hpp"
 
 
 class CUDA_simulation
