@@ -5,7 +5,6 @@
 #include "vehicle/controller_CUDA.hpp"
 #include "vehicle/dynamics_CUDA.hpp"
 #include "vehicle/vehicleTypes.hpp"
-#include "vehicle/vehicleBatch.hpp"
 #include "vehicle/environment.hpp"
 
 #include "vehicle/SearchPlanner_CUDA.hpp"
@@ -135,7 +134,7 @@ __global__ void updateVehicles(float* vs_x,
     return;
 }
 
-void CUDA_simulation::HtD_vehicles(const vehicleBatch& vehicles){
+void CUDA_simulation::HtD_vehicles(const vehicleBatch_CUDA& vehicles){
     //create devices and allocate vehicle data
         const std::size_t floatBytes = this->v_count_ * sizeof(float);
      
@@ -158,7 +157,7 @@ void CUDA_simulation::HtD_vehicles(const vehicleBatch& vehicles){
 
 }
 
-void CUDA_simulation::DtH_vehicles(vehicleBatch& vehicles){
+void CUDA_simulation::DtH_vehicles(vehicleBatch_CUDA& vehicles){
     const std::size_t floatBytes = v_count_ * sizeof(float);
 
     //copy vehicle data from device to host
@@ -201,11 +200,11 @@ void CUDA_simulation::HtD_fluid(){
 void CUDA_simulation::DtH_fluid(){
 
     //copy vehicle data from device to host
-    const std::size_t fluidBytes = this->env_.m_width * this->env_.m_height * sizeof(float);
-    cudaMemcpy(this->env_.m_u_velocity.data(), this->d_u_, fluidBytes, cudaMemcpyDeviceToHost);
-    cudaMemcpy(this->env_.m_v_velocity.data(), this->d_v_, fluidBytes, cudaMemcpyDeviceToHost);
-    cudaMemcpy(this->env_.m_u_velocity_prev.data(), this->d_u_prev_, fluidBytes, cudaMemcpyDeviceToHost);
-    cudaMemcpy(this->env_.m_v_velocity_prev.data(),this->d_v_prev_, fluidBytes, cudaMemcpyDeviceToHost);
+    const std::size_t fluidBytes = this->env_.fluid_grid.m_width * this->env_.fluid_grid.m_height * sizeof(float);
+    cudaMemcpy(this->env_.fluid_grid.m_u_velocity.data(), this->d_u_, fluidBytes, cudaMemcpyDeviceToHost);
+    cudaMemcpy(this->env_.fluid_grid.m_v_velocity.data(), this->d_v_, fluidBytes, cudaMemcpyDeviceToHost);
+    cudaMemcpy(this->env_.fluid_grid.m_u_velocity_prev.data(), this->d_u_prev_, fluidBytes, cudaMemcpyDeviceToHost);
+    cudaMemcpy(this->env_.fluid_grid.m_v_velocity_prev.data(),this->d_v_prev_, fluidBytes, cudaMemcpyDeviceToHost);
 
         //check for allocation errors
     cudaError_t error = cudaGetLastError();
@@ -216,7 +215,7 @@ void CUDA_simulation::DtH_fluid(){
 }
 
 void CUDA_simulation::init_simulation( 
-    vehicleBatch& vehicles){
+    vehicleBatch_CUDA& vehicles){
         
         //init cel count
        // this->cell_count_ = cell_count;
@@ -280,7 +279,7 @@ void CUDA_simulation::step_vehicles(){
 }
 
 void CUDA_simulation::runCudaSimulation(
-    vehicleBatch& vehicles,
+    vehicleBatch_CUDA& vehicles,
     std::size_t steps){
 
 

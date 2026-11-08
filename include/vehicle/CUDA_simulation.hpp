@@ -1,7 +1,7 @@
 #pragma once
 #include <cstddef>
 #include <cuda_runtime.h>
-#include "vehicleBatch.hpp"
+#include "vehicle/vehicleBatch_CUDA.hpp"
 #include "vehicle/environment_CUDA.hpp"
 #include "vehicle/ProbabilityMap_CUDA.hpp"
 #include "vehicle/controller_CUDA.hpp"
@@ -34,10 +34,10 @@ public:
 
     ~CUDA_simulation();
 
-    void runCudaSimulation(vehicleBatch& vehicles, std::size_t steps);
-    void init_simulation(vehicleBatch& vehicles);
-    void HtD_vehicles(const vehicleBatch& vehicles);
-    void DtH_vehicles(vehicleBatch& vehicles);
+    void runCudaSimulation(vehicleBatch_CUDA& vehicles, std::size_t steps);
+    void init_simulation(vehicleBatch_CUDA& vehicles);
+    void HtD_vehicles(const vehicleBatch_CUDA& vehicles);
+    void DtH_vehicles(vehicleBatch_CUDA& vehicles);
     void step_vehicles();
     
     void HtD_fluid();

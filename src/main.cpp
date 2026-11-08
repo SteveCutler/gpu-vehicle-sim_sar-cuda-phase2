@@ -150,6 +150,8 @@ int main(int argNum, char* argVals[]){
     #endif
 
     #ifdef ENABLE_CUDA
+        vehicleBatch_CUDA vehicles_cuda(N, env, target.x, height - target.y);
+
         SearchPlanner_CUDA planner_cuda(50);
         ProbabilityMap_CUDA p_map_cuda(driftDynamics, width, height, particle_count, target.x, target.y, prob_rad, cell_size);
         ProbabilityMap_CUDA tempMap_cuda(driftDynamics, width, height, particle_count, target.x, target.y, prob_rad, cell_size);
@@ -167,7 +169,7 @@ int main(int argNum, char* argVals[]){
         if(useCuda){
                 //move work to GPU
                 #ifdef ENABLE_CUDA
-                   CudaSim.runCudaSimulation(vehicles, steps);
+                   CudaSim.runCudaSimulation(vehicles_cuda, steps);
                 #endif
             }
         else{

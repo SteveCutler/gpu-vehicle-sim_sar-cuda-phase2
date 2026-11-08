@@ -3,7 +3,7 @@
 #include "fluid/FluidGrid.hpp"
 #include "fluid/Emitter.hpp"
 
-class environment
+class environment_CUDA
 {
 public: 
 
@@ -17,7 +17,7 @@ private:
 std::vector<float> velFieldx, velFieldy;
 
 public:
-environment(std::size_t w, std::size_t h, std::vector<Emitter*>& emitters, std::size_t seed);
+environment_CUDA(std::size_t w, std::size_t h, std::vector<Emitter*>& emitters, std::size_t seed);
 
 void update_fluid(float dt);
 
