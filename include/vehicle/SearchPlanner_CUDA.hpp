@@ -25,8 +25,8 @@ public:
         const environment_CUDA& env, 
         const float dt,
         ProbabilityMap_CUDA& tempMap,
-        Dynamics_CUDA& dynamics,
-        Controller_CUDA& controller,
+        DynamicsCUDA& dynamics,
+        ControllerCUDA& controller,
         std::size_t height_);
     ~SearchPlanner_CUDA() = default;
 };
