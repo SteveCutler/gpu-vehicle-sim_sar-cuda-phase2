@@ -1,6 +1,6 @@
 #pragma once
 #include <vector>
-#include "fluid/FluidGrid.hpp"
+#include "fluid/FluidGrid_CUDA.hpp"
 #include "fluid/Emitter.hpp"
 
 class environment_CUDA
@@ -9,7 +9,7 @@ public:
 
 std::size_t m_width;
 std::size_t m_height;
-FluidGrid fluid_grid;
+FluidGrid_CUDA fluid_grid;
 std::vector<Emitter*> emitters;
 std::size_t seed;
 

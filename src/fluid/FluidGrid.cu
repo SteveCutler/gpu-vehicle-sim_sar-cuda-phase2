@@ -1,4 +1,4 @@
-#include "fluid/FluidGrid.hpp"
+#include "fluid/FluidGrid_CUDA.hpp"
 #include <vector>
 #include<iostream>
 #include <random>
@@ -10,7 +10,7 @@
 #include <stdexcept>
 
 
-FluidGrid::FluidGrid(std::size_t width, std::size_t height, std::vector<Emitter*> emitters, int seed, bool threaded):
+FluidGrid_CUDA::FluidGrid_CUDA(std::size_t width, std::size_t height, std::vector<Emitter*> emitters, int seed, bool threaded):
 
 m_pixels(width * height * 4, std::uint8_t{0}),
 m_buoyancy(50.f),
@@ -79,74 +79,74 @@ m_divergence(width*height, 0.0f)
 }
 
 //field getters
-const std::vector<float>& FluidGrid::density_r() const{
+const std::vector<float>& FluidGrid_CUDA::density_r() const{
     return m_density_r;
 }
-const std::vector<float>& FluidGrid::density_g() const{
+const std::vector<float>& FluidGrid_CUDA::density_g() const{
     return m_density_g;
 }
-const std::vector<float>& FluidGrid::density_b() const{
+const std::vector<float>& FluidGrid_CUDA::density_b() const{
     return m_density_b;
 }
 
-const std::vector<float>& FluidGrid::u_velocity() const{
+const std::vector<float>& FluidGrid_CUDA::u_velocity() const{
     return m_u_velocity;
 };
 
-const std::vector<float>& FluidGrid::v_velocity() const{
+const std::vector<float>& FluidGrid_CUDA::v_velocity() const{
     return m_v_velocity;
 };
 
-const std::vector<float>& FluidGrid::get_noise() const{
+const std::vector<float>& FluidGrid_CUDA::get_noise() const{
     return m_noise;
 };
 
-const std::vector<std::uint8_t> & FluidGrid::get_pixels() const{
+const std::vector<std::uint8_t> & FluidGrid_CUDA::get_pixels() const{
     return m_pixels;
 };
 
 // timing getters
 
-float FluidGrid::time_noise() const {
+float FluidGrid_CUDA::time_noise() const {
     return m_noise_ms;
 };
 
-float FluidGrid::time_vel() const{
+float FluidGrid_CUDA::time_vel() const{
     return m_vel_ms;
 };
 
-float FluidGrid::time_divergence() const{
+float FluidGrid_CUDA::time_divergence() const{
     return m_div_ms;
 };
 
-float FluidGrid::time_pressure() const{
+float FluidGrid_CUDA::time_pressure() const{
     return m_pressure_ms;
 };
 
-float FluidGrid::time_diffuse() const{
+float FluidGrid_CUDA::time_diffuse() const{
     return m_diffuse_ms;
 };
 
-float FluidGrid::time_advect() const{
+float FluidGrid_CUDA::time_advect() const{
     return m_advect_ms;
 };
 
-float FluidGrid::time_advectVel() const{
+float FluidGrid_CUDA::time_advectVel() const{
     return m_advectVel_ms;
 };
 
-float FluidGrid::time_project() const{
+float FluidGrid_CUDA::time_project() const{
     return m_project_ms;
 };
 
-float FluidGrid::time_addSource() const{
+float FluidGrid_CUDA::time_addSource() const{
     return m_addSource_ms;
 };
 
 
 //UPDATE LOOP
 
-void FluidGrid::update(float dt){
+void FluidGrid_CUDA::update(float dt){
 
     m_elapsed += dt;
 
@@ -227,7 +227,7 @@ void FluidGrid::update(float dt){
 //HELPERS
 
 //measure divergence at x y
-float FluidGrid::divergenceAt(std::size_t x, std::size_t y) const{
+float FluidGrid_CUDA::divergenceAt(std::size_t x, std::size_t y) const{
     
     std::size_t row = m_width*y;
     std::size_t index = row+x;
@@ -243,7 +243,7 @@ float FluidGrid::divergenceAt(std::size_t x, std::size_t y) const{
 }
 
 //measure divergence loop for test purposes
-DivergenceStats FluidGrid::measureDivergence() const{
+DivergenceStats FluidGrid_CUDA::measureDivergence() const{
 
     DivergenceStats stats;
 
@@ -252,7 +252,7 @@ DivergenceStats FluidGrid::measureDivergence() const{
 
     for(std::size_t x = 1; x<m_width-1; x++){
         for(std::size_t y = 1; y<m_height-1; y++){
-            //calculating divergence at Fluidgrid cell
+            //calculating divergence at FluidGrid_CUDA cell
             const double value = static_cast<double>(divergenceAt(x,y));
 
             //finite number check
@@ -281,10 +281,10 @@ DivergenceStats FluidGrid::measureDivergence() const{
 
 }
 
-void FluidGrid::setVelocityAt(std::size_t x, std::size_t y, float u, float v){
+void FluidGrid_CUDA::setVelocityAt(std::size_t x, std::size_t y, float u, float v){
 
     if(x>=m_width || y>=m_height){
-        throw std::out_of_range("Velocity position outside of Fluidgrid");
+        throw std::out_of_range("Velocity position outside of FluidGrid_CUDA");
     }
 
     const std::size_t index = y*m_width +x;
@@ -293,7 +293,7 @@ void FluidGrid::setVelocityAt(std::size_t x, std::size_t y, float u, float v){
     m_v_velocity[index] = v;
 }
 
-float FluidGrid::density_sample(std::size_t i) const{
+float FluidGrid_CUDA::density_sample(std::size_t i) const{
     const float density = std::max({
         m_density_r[i],
         m_density_g[i],
@@ -305,7 +305,7 @@ float FluidGrid::density_sample(std::size_t i) const{
 }
 
 //helper for handling boundaries of any scalar field
-void FluidGrid::scalarBoundaries(std::vector<float>& field){
+void FluidGrid_CUDA::scalarBoundaries(std::vector<float>& field){
 
     assert(m_width >= 2);
     assert(m_height >= 2);
@@ -337,7 +337,7 @@ void FluidGrid::scalarBoundaries(std::vector<float>& field){
     field[m_width*m_height-1] = (field[m_width*m_height-2]+field[m_width*m_height-m_width-1])*.5f;
 }
 
-void FluidGrid::reset_density(){
+void FluidGrid_CUDA::reset_density(){
     std::fill(m_density_r.begin(), m_density_r.end(), 0.0f);
     std::fill(m_density_g.begin(), m_density_g.end(), 0.0f);
     std::fill(m_density_b.begin(), m_density_b.end(), 0.0f);
@@ -355,7 +355,7 @@ void FluidGrid::reset_density(){
     std::fill(m_divergence.begin(), m_divergence.end(), 0.0f);
 
 };
-void FluidGrid::projectStep(){
+void FluidGrid_CUDA::projectStep(){
     //clearPressure();
     m_performance_clock.restartMs();
     if(m_mult_threaded){
@@ -388,12 +388,12 @@ void FluidGrid::projectStep(){
 
 }
 
-void FluidGrid::swapVel(){
+void FluidGrid_CUDA::swapVel(){
     std::swap(m_u_velocity, m_u_velocity_prev);
     std::swap(m_v_velocity, m_v_velocity_prev);
 };
 
-void FluidGrid::velBoundaries(){
+void FluidGrid_CUDA::velBoundaries(){
     //set vel on left and right boundaries
     for(std::size_t y = 0; y<m_height; y++){
         std::size_t b_l = y*m_width;
@@ -421,7 +421,7 @@ void FluidGrid::velBoundaries(){
     }
 }
 
-void FluidGrid::pressureBoundaries(){
+void FluidGrid_CUDA::pressureBoundaries(){
     //set pressure on left and right boundaries
     for(std::size_t y = 0; y<m_height; y++){
         std::size_t b_l = y*m_width;
@@ -445,13 +445,13 @@ void FluidGrid::pressureBoundaries(){
     }
 }
 
-void FluidGrid::clearPressure(){
+void FluidGrid_CUDA::clearPressure(){
     std::fill(m_pressure.begin(),m_pressure.end(),0.f);
     std::fill(m_pressure_prev.begin(),m_pressure_prev.end(),0.f);
 };
 
 
-void FluidGrid::calcNoise(float dt){
+void FluidGrid_CUDA::calcNoise(float dt){
     m_elapsed += dt*m_noiseTimeMult;   
 
     m_noise_gen.SetFrequency(m_noise_freq);
@@ -466,7 +466,7 @@ void FluidGrid::calcNoise(float dt){
     }
 }
 
-void FluidGrid::calcNoise_Threaded(float sample_time){
+void FluidGrid_CUDA::calcNoise_Threaded(float sample_time){
     
 
     parallelForRows(0, m_height,
@@ -476,7 +476,7 @@ void FluidGrid::calcNoise_Threaded(float sample_time){
 
 };
 
-void FluidGrid::calcNoiseRows(float dt, std::size_t begin, std::size_t end){
+void FluidGrid_CUDA::calcNoiseRows(float dt, std::size_t begin, std::size_t end){
 
     std::size_t index = begin*m_width;
 
@@ -490,8 +490,8 @@ void FluidGrid::calcNoiseRows(float dt, std::size_t begin, std::size_t end){
     }
 };
 
-void FluidGrid::calcVel_Threaded(float dt){
-    FluidGrid::parallelForRows(
+void FluidGrid_CUDA::calcVel_Threaded(float dt){
+    FluidGrid_CUDA::parallelForRows(
         1,
         m_height-1,
         [this, dt](std::size_t begin, std::size_t end){
@@ -500,7 +500,7 @@ void FluidGrid::calcVel_Threaded(float dt){
     );
 }
 
-void FluidGrid::calcVel_Rows(float dt, std::size_t begin, std::size_t end){
+void FluidGrid_CUDA::calcVel_Rows(float dt, std::size_t begin, std::size_t end){
     for(std::size_t y = begin; y<end; y++){
         std::size_t row = y*m_width;
 
@@ -527,14 +527,14 @@ void FluidGrid::calcVel_Rows(float dt, std::size_t begin, std::size_t end){
 }
 
 
-void FluidGrid::swapDensity(){
+void FluidGrid_CUDA::swapDensity(){
     std::swap(m_density_r, m_density_r_prev);
     std::swap(m_density_g, m_density_g_prev);
     std::swap(m_density_b, m_density_b_prev);
 }
 
 
-void FluidGrid::addSource(size_t x, size_t y, float size, Vec3 clr){
+void FluidGrid_CUDA::addSource(size_t x, size_t y, float size, Vec3 clr){
 
    
     for(int dy = -size; dy<=size; dy++){
@@ -573,8 +573,8 @@ void FluidGrid::addSource(size_t x, size_t y, float size, Vec3 clr){
 
 //DYNAMIC VEL FUNCTIONS
 
-void FluidGrid::advectVel_Threaded(float dt){
-    FluidGrid::parallelForRows(
+void FluidGrid_CUDA::advectVel_Threaded(float dt){
+    FluidGrid_CUDA::parallelForRows(
         1,
         m_height-1,
         [this, dt](std::size_t begin, std::size_t end){
@@ -585,7 +585,7 @@ void FluidGrid::advectVel_Threaded(float dt){
 
 }; 
 
-void FluidGrid::advectVel_Rows(float dt, std::size_t begin, std::size_t end){
+void FluidGrid_CUDA::advectVel_Rows(float dt, std::size_t begin, std::size_t end){
     float new_u_vel = 0.f;
     float new_v_vel = 0.f;
 
@@ -657,8 +657,8 @@ void FluidGrid::advectVel_Rows(float dt, std::size_t begin, std::size_t end){
     }
 }
 
-void FluidGrid::diffuseVel_Threaded(float dt){
-    FluidGrid::parallelForRows(
+void FluidGrid_CUDA::diffuseVel_Threaded(float dt){
+    FluidGrid_CUDA::parallelForRows(
         1,
         m_height-1,
         [this, dt](std::size_t begin, std::size_t end){
@@ -667,7 +667,7 @@ void FluidGrid::diffuseVel_Threaded(float dt){
     );    
 }    
 
-void FluidGrid::diffuseVel_Rows(float dt, std::size_t begin, std::size_t end){
+void FluidGrid_CUDA::diffuseVel_Rows(float dt, std::size_t begin, std::size_t end){
 
     float left_u = 0.f;
     float right_u = 0.f;
@@ -735,8 +735,8 @@ void FluidGrid::diffuseVel_Rows(float dt, std::size_t begin, std::size_t end){
 };
 
 
-void FluidGrid::gen_pixels_Threaded(){
-    FluidGrid::parallelForRows(
+void FluidGrid_CUDA::gen_pixels_Threaded(){
+    FluidGrid_CUDA::parallelForRows(
         0,
         m_height,
         [this](std::size_t begin, std::size_t end){
@@ -745,7 +745,7 @@ void FluidGrid::gen_pixels_Threaded(){
     );    
 }    
 
-void FluidGrid::gen_pixels_Rows(std::size_t begin, std::size_t end){
+void FluidGrid_CUDA::gen_pixels_Rows(std::size_t begin, std::size_t end){
             //Convert density buffer to pixel data
         for (std::size_t y = begin; y<end; y++){
             std::size_t row = y*m_width;
@@ -787,8 +787,8 @@ void FluidGrid::gen_pixels_Rows(std::size_t begin, std::size_t end){
 
 
 
-void FluidGrid::calcDivergence_Threaded(){
-    FluidGrid::parallelForRows(
+void FluidGrid_CUDA::calcDivergence_Threaded(){
+    FluidGrid_CUDA::parallelForRows(
         1,
         m_height-1,
         [this](std::size_t begin, std::size_t end){
@@ -797,7 +797,7 @@ void FluidGrid::calcDivergence_Threaded(){
     );
 }
 
-void FluidGrid::calcDivergence_Rows(std::size_t begin, std::size_t end){
+void FluidGrid_CUDA::calcDivergence_Rows(std::size_t begin, std::size_t end){
 
    
     
@@ -827,8 +827,8 @@ void FluidGrid::calcDivergence_Rows(std::size_t begin, std::size_t end){
 
 };
 
-void FluidGrid::project_Threaded(){
-    FluidGrid::parallelForRows(
+void FluidGrid_CUDA::project_Threaded(){
+    FluidGrid_CUDA::parallelForRows(
         1,
         m_height-1,
         [this](std::size_t begin, std::size_t end){
@@ -837,7 +837,7 @@ void FluidGrid::project_Threaded(){
     );
 }
 
-void FluidGrid::project_Rows(std::size_t begin, std::size_t end){
+void FluidGrid_CUDA::project_Rows(std::size_t begin, std::size_t end){
     
     for(std::size_t y = begin; y<end; y++){
         std::size_t row = y*m_width;
@@ -865,7 +865,7 @@ void FluidGrid::project_Rows(std::size_t begin, std::size_t end){
 };
 
 
-void FluidGrid::solvePressure(){
+void FluidGrid_CUDA::solvePressure(){
     //one iteratio of pressure solve
     std::size_t k = 0;
     while (k<m_pressure_iter){
@@ -902,7 +902,7 @@ void FluidGrid::solvePressure(){
 
 };
 
-void FluidGrid::solvePressureRows(std::size_t begin, std::size_t end){
+void FluidGrid_CUDA::solvePressureRows(std::size_t begin, std::size_t end){
 
     //one iteratio of pressure solve
 
@@ -930,7 +930,7 @@ void FluidGrid::solvePressureRows(std::size_t begin, std::size_t end){
 
 };
 
-void FluidGrid::solvePressureThreaded(){
+void FluidGrid_CUDA::solvePressureThreaded(){
     std::size_t k = 0;
 
     while(k<m_pressure_iter){
@@ -949,12 +949,12 @@ void FluidGrid::solvePressureThreaded(){
         std::swap(m_pressure,m_pressure_prev);
     }
 
-    //swap back to most recent pressure Fluidgrid on last iteration, optimize this away at some point
+    //swap back to most recent pressure FluidGrid_CUDA on last iteration, optimize this away at some point
     std::swap(m_pressure,m_pressure_prev);
 
 };
 
-void FluidGrid::diffuse(float dt, const std::vector<float>& source, std::vector<float>& destination){
+void FluidGrid_CUDA::diffuse(float dt, const std::vector<float>& source, std::vector<float>& destination){
 const float a = m_diff_co * dt;
 
 //take source field as initial guess
@@ -967,7 +967,7 @@ std::vector<float>* next = &m_diffusion_scratch;
 for(std::size_t iteration = 0; iteration < m_diffusion_iterations; iteration++){
 
     if(m_mult_threaded){
-        FluidGrid::parallelForRows(
+        FluidGrid_CUDA::parallelForRows(
         1,
         m_height-1,
         [this, a, &source, current, next](std::size_t begin, std::size_t end){
@@ -990,7 +990,7 @@ for(std::size_t iteration = 0; iteration < m_diffusion_iterations; iteration++){
 
 
 
-void FluidGrid::diffuseJacobi_Rows(float a, const std::vector<float>& source, const std::vector<float>& current,  std::vector<float>& next, std::size_t begin, std::size_t end){
+void FluidGrid_CUDA::diffuseJacobi_Rows(float a, const std::vector<float>& source, const std::vector<float>& current,  std::vector<float>& next, std::size_t begin, std::size_t end){
 
     //5 points diffusion kernel
 
@@ -1018,8 +1018,8 @@ void FluidGrid::diffuseJacobi_Rows(float a, const std::vector<float>& source, co
 }
 
 
-void FluidGrid::advect_decay_Threaded(float dt, const std::vector<float>& source, std::vector<float>& dest){
-    FluidGrid::parallelForRows(
+void FluidGrid_CUDA::advect_decay_Threaded(float dt, const std::vector<float>& source, std::vector<float>& dest){
+    FluidGrid_CUDA::parallelForRows(
         1,
         m_height-1,
         [this, dt, &source, &dest](std::size_t begin, std::size_t end){
@@ -1030,7 +1030,7 @@ void FluidGrid::advect_decay_Threaded(float dt, const std::vector<float>& source
     
 }
 
-void FluidGrid::advect_decay_Rows(float dt, const std::vector<float>& source, std::vector<float>& dest, std::size_t begin, std::size_t end){
+void FluidGrid_CUDA::advect_decay_Rows(float dt, const std::vector<float>& source, std::vector<float>& dest, std::size_t begin, std::size_t end){
 
 
     float new_dens = 0.f;
@@ -1081,7 +1081,7 @@ void FluidGrid::advect_decay_Rows(float dt, const std::vector<float>& source, st
 }
 
 
-std::pair<float,float> FluidGrid::vel_sample(float x, float y) const{
+std::pair<float,float> FluidGrid_CUDA::vel_sample(float x, float y) const{
         float u_vel = 0.f;
         float v_vel = 0.f;
 
