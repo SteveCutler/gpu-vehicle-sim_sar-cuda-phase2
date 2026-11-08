@@ -9,13 +9,13 @@
 class ProbabilityMap
 {
 private:
-DriftDynamics DD_;
 std::mt19937 rng_;
 float p_rad_;
 float origin_x_;
 float origin_y_;
 
 public:
+    DriftDynamics DD_;
     std::size_t width_;
     std::size_t height_;
     std::size_t target_cell;

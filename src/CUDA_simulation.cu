@@ -184,10 +184,10 @@ void CUDA_simulation::HtD_fluid(){
         const std::size_t fluidBytes = this->env_.m_width * this->env_.m_height * sizeof(float);
      
         //copy data from host to device
-        cudaMemcpy(this->d_u_, this->env_.m_u_velocity.data(), fluidBytes, cudaMemcpyHostToDevice);
-        cudaMemcpy(this->d_v_, this->env_.m_v_velocity.data(), fluidBytes, cudaMemcpyHostToDevice);
-        cudaMemcpy(this->d_u_prev_, this->env_.m_u_velocity_prev.data(), fluidBytes, cudaMemcpyHostToDevice);
-        cudaMemcpy(this->d_v_prev_, this->env_.m_v_velocity_prev.data(), fluidBytes, cudaMemcpyHostToDevice);
+        cudaMemcpy(this->d_u_, this->env_.fluid_grid.m_u_velocity.data(), fluidBytes, cudaMemcpyHostToDevice);
+        cudaMemcpy(this->d_v_, this->env_.fluid_grid.m_v_velocity.data(), fluidBytes, cudaMemcpyHostToDevice);
+        cudaMemcpy(this->d_u_prev_, this->env_.fluid_grid.m_u_velocity_prev.data(), fluidBytes, cudaMemcpyHostToDevice);
+        cudaMemcpy(this->d_v_prev_, this->env_.fluid_grid.m_v_velocity_prev.data(), fluidBytes, cudaMemcpyHostToDevice);
 
         //check for allocation errors
         cudaError_t error = cudaGetLastError();
