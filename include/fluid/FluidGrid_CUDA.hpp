@@ -220,9 +220,10 @@ class FluidGrid
         float m_addSource_ms;
         float m_render_ms;
 
+    public:
         //Emitters
         std::vector<Emitter*> m_emitters;
-
+    
         // SoA member variables
         std::vector<float> m_density_r;
         std::vector<float> m_density_g;

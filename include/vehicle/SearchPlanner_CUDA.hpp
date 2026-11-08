@@ -1,9 +1,9 @@
 #pragma once
 #include "vehicle/vehicleTypes.hpp"
-#include "vehicle/ProbabilityMap.hpp"
-#include "vehicle/environment.hpp"
-#include "vehicle/dynamics.hpp"
-#include "vehicle/controller.hpp"
+#include "vehicle/ProbabilityMap_CUDA.hpp"
+#include "vehicle/environment_CUDA.hpp"
+#include "vehicle/dynamics_CUDA.hpp"
+#include "vehicle/controller_CUDA.hpp"
 #include <cuda_runtime.h>
 #include <vector>
 
@@ -22,11 +22,11 @@ public:
     
     std::pair<float,float> chooseWaypoint(VehicleState vs, 
         const std::vector<PredictionParticle>& particles, 
-        const environment& env, 
+        const environment_CUDA& env, 
         const float dt,
-        ProbabilityMap& tempMap,
-        Dynamics& dynamics,
-        Controller& controller,
+        ProbabilityMap_CUDA& tempMap,
+        Dynamics_CUDA& dynamics,
+        Controller_CUDA& controller,
         std::size_t height_);
     ~SearchPlanner_CUDA() = default;
 };

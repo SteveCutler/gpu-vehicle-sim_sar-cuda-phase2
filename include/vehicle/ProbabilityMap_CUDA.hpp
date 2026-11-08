@@ -2,7 +2,7 @@
 #include <vector>
 #include <random>
 #include "vehicle/DriftItem.hpp"
-#include "vehicle/environment.hpp"
+#include "vehicle/environment_CUDA.hpp"
 #include "vehicle/DriftDynamics.hpp"
 #include "vehicle/vehicleTypes.hpp"
 
@@ -28,7 +28,7 @@ public:
 public:
     ProbabilityMap_CUDA(DriftDynamics& DD, ::size_t width, std::size_t height, std::size_t num_p, float est_x, float est_y, float p_rad, std::size_t cell_size);
 
-    void update(const environment& env, float dt);
+    void update(const environment_CUDA& env, float dt);
     
     void add_Particles();
 

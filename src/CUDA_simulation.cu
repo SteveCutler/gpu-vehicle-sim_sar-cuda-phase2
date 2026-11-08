@@ -199,7 +199,7 @@ void CUDA_simulation::HtD_fluid(){
 void CUDA_simulation::DtH_fluid(){
 
     //copy vehicle data from device to host
-    const std::size_t fluidBytes = this->env_.fluid_grid.m_width * this->env_.fluid_grid.m_height * sizeof(float);
+    const std::size_t fluidBytes = this->env_.m_width * this->env_.m_height * sizeof(float);
     cudaMemcpy(this->env_.fluid_grid.m_u_velocity.data(), this->d_u_, fluidBytes, cudaMemcpyDeviceToHost);
     cudaMemcpy(this->env_.fluid_grid.m_v_velocity.data(), this->d_v_, fluidBytes, cudaMemcpyDeviceToHost);
     cudaMemcpy(this->env_.fluid_grid.m_u_velocity_prev.data(), this->d_u_prev_, fluidBytes, cudaMemcpyDeviceToHost);

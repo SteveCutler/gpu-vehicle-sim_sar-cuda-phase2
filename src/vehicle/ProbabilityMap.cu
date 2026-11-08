@@ -1,4 +1,4 @@
-#include "vehicle/ProbabilityMap.hpp"
+
 #include "vehicle/ProbabilityMap_CUDA.hpp"
 #include <vector>
 #include <random>
@@ -6,7 +6,7 @@
 #include "vehicle/DriftDynamics.hpp"
 #include <cuda_runtime.h>
 
-ProbabilityMap::ProbabilityMap(DriftDynamics& DD, ::size_t width, std::size_t height, std::size_t num_p, float est_x, float est_y, float p_rad, std::size_t cell_size):
+ProbabilityMap::ProbabilityMap(DriftDynamics& DD, std::size_t width, std::size_t height, std::size_t num_p, float est_x, float est_y, float p_rad, std::size_t cell_size):
 width_(width),
 height_(height),
 num_p_(num_p),
@@ -26,7 +26,7 @@ add_Particles();
 
 };
 
-void ProbabilityMap::update(const environment& env, float dt){
+void ProbabilityMap::update(const environment_CUDA& env, float dt){
 
    // add_Particles();
 
