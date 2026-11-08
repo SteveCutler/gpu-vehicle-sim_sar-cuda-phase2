@@ -148,7 +148,8 @@ int main(int argNum, char* argVals[]){
     #endif
 
     #ifdef ENABLE_CUDA
-        CUDA_simulation CudaSim(planner, target, p_map, tempMap, env, N, dt);
+        SearchPlanner_CUDA planner_cuda(50);
+        CUDA_simulation CudaSim(planner_cuda, target, p_map, tempMap, env, N, dt);
         CudaSim.init_simulation(
             vehicles
         );
@@ -162,7 +163,7 @@ int main(int argNum, char* argVals[]){
         if(useCuda){
                 //move work to GPU
                 #ifdef ENABLE_CUDA
-                   CudaSim.runCudaSimulation();
+                   CudaSim.runCudaSimulation(vehicles, steps);
                 #endif
             }
         else{

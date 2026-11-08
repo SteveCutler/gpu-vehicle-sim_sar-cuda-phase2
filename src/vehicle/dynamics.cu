@@ -2,7 +2,7 @@
 #include "vehicle/dynamics_CUDA.hpp"
 #include <cmath>
 #include <cuda_runtime.h>
-#include <cuda/std/utility>
+
 
 __device__ DynamicsCuda::DynamicsCuda(){
 

@@ -2,6 +2,7 @@
 #include "vehicle/vehicleTypes.hpp"
 #include <cuda_runtime.h>
 #include "vehicle/environment.hpp"
+#include <cuda/std/utility>
 
 
 class DynamicsCuda

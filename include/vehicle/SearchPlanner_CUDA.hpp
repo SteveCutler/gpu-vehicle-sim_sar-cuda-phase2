@@ -7,7 +7,7 @@
 #include <cuda_runtime.h>
 #include <vector>
 
-class SearchPlanner
+class SearchPlanner_CUDA
 {
 private:
 
@@ -18,7 +18,7 @@ private:
     std::size_t w_index_;
 
 public:
-    SearchPlanner(std::size_t horizon);
+    SearchPlanner_CUDA(std::size_t horizon);
     
     std::pair<float,float> chooseWaypoint(VehicleState vs, 
         const std::vector<PredictionParticle>& particles, 
@@ -28,5 +28,5 @@ public:
         Dynamics& dynamics,
         Controller& controller,
         std::size_t height_);
-    ~SearchPlanner() = default;
+    ~SearchPlanner_CUDA() = default;
 };

@@ -49,7 +49,7 @@ public:
     VehicleState vs{};
     Action action{};
     VehicleState newState{};
-    SearchPlanner& planner_;
+    SearchPlanner_CUDA& planner_;
     DriftItem& target_;
     ProbabilityMap& p_map_;
     ProbabilityMap& temp_map_;

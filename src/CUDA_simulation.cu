@@ -8,7 +8,7 @@
 #include "vehicle/vehicleBatch.hpp"
 #include "environment.hpp"
 #include "ProbabilityMap.hpp"
-#include "SearchPlanner.hpp"
+#include "SearchPlanner_CUDA.hpp"
 #include "vehicle/controller.hpp"
 #include "vehicle/dynamics.hpp"
 

@@ -1,11 +1,11 @@
-#include "vehicle/SearchPlanner.hpp"
+#include "vehicle/SearchPlanner_CUDA.hpp"
 #include "vehicle/vehicleTypes.hpp"
 #include <vector>
 #include <cuda_runtime.h>
 #include <set>
 #include <algorithm>
 
-SearchPlanner::SearchPlanner(std::size_t horizon):
+SearchPlanner_CUDA::SearchPlanner_CUDA(std::size_t horizon):
 horizon_(horizon),
 w_index_(0)
 {
@@ -13,7 +13,7 @@ w_index_(0)
     forecast_.resize(horizon_);
 }
 
-std::pair<float,float> SearchPlanner::chooseWaypoint(VehicleState vs, 
+std::pair<float,float> SearchPlanner_CUDA::chooseWaypoint(VehicleState vs, 
     const std::vector<PredictionParticle>& particles, 
     const environment& env, 
     const float dt,
