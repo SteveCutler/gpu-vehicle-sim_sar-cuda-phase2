@@ -1,19 +1,17 @@
 #pragma once
 
 
-#include <SFML/System/Vector3.hpp>
-#include <SFML/System/Vector2.hpp>
-#include <SFML/Graphics/Color.hpp>
+#include "fluid/FluidTypes.hpp"
 
 class Emitter
 {
 
 public:
-Emitter(sf::Vector2f pos, float rad, sf::Vector3f clr);
+Emitter(Vec2 pos, float rad, Vec3 clr);
 
-sf::Vector2f m_pos;
+Vec2 m_pos;
 float m_rad;
-sf::Vector3f m_clr;
+Vec3 m_clr;
 };
 
 
