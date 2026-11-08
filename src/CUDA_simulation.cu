@@ -14,6 +14,7 @@
 
 #include <iostream>
 
+//velocity field sample device helper function
 __device__ cuda::std::pair<float,float> vel_sample(    
     const float* u_prev,
     const float* v_prev,
@@ -89,7 +90,6 @@ __global__ void updateVehicles(float* vs_x,
         return;
     }
 
-    //allocating variables outside hot loop
     ControllerCuda controller;
     DynamicsCuda dynamics;
     VehicleState vs;
@@ -306,10 +306,12 @@ std::size_t CUDA_simulation::runCudaSimulation(
     //run sim for steps amount of steps
     while(curr_step < steps){
         
-        //advance vehicles
+        //copy vehicles and fluid data to GPU
         HtD_vehicles(vehicles);
         HtD_fluid();
+        //advance vehicles
         step_vehicles();
+        //copy vehicle data back
         DtH_vehicles(vehicles);
     
         //scan for goal/kill particles
