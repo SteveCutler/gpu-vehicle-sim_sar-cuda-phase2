@@ -15,12 +15,10 @@
 
 //Fluid Include
 #include <iostream>
-#include <SFML/Window.hpp>
-#include <SFML/Graphics.hpp>
 #include <vector>
 
 #include "fluid/FluidGrid.hpp"
-#include "fluid/Slider.hpp"
+#include "fluid/FluidTypes.hpp"
 #include "fluid/Emitter.hpp"
 
 #ifdef ENABLE_RENDERER
@@ -60,7 +58,7 @@ int main(int argNum, char* argVals[]){
     //FLUID INIT
     ////////////
 
-        Emitter blue{sf::Vector2f(width*.5f,height*.5f), width*1.0f, sf::Vector3f(0.f,0.f,.2f)};
+        Emitter blue{Vec2{width*.5f,height*.5f}, width*1.0f, Vec3{0.f,0.f,.2f}};
 
 
         std::vector<Emitter*> emitters{

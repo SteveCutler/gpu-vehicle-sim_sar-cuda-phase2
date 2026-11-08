@@ -2,15 +2,15 @@
 
 #include <cstddef>
 #include <vector>
-#include "../include/fluid/FastNoiseLite.h"
-#include "../include/fluid/Emitter.hpp"
+#include "fluid/FastNoiseLite.h"
+#include "fluid/Emitter.hpp"
 #include <thread>
-#include <SFML/System/Clock.hpp>
+#include <algorithm>
+#include <cstdint>
+#include <utility>
+#include "PerformanceClock.hpp"
+#include "fluid/FluidTypes.hpp"
 
-#ifdef ENABLE_RENDERER
-#include <SFML/Graphics.hpp>
-#include <SFML/Window.hpp>
-#endif
 
 //Divergence measurement test struct
 struct DivergenceStats {
@@ -107,7 +107,7 @@ class FluidGrid
 
 
         //timing getters
-        sf::Clock m_performance_clock;
+        PerformanceClock m_performance_clock;
         float time_noise() const;
         float time_vel() const;
         float time_divergence() const;
@@ -164,7 +164,7 @@ class FluidGrid
         void project_Rows(std::size_t begin, std::size_t end);
         
         
-        void addSource(size_t x, size_t y, float size, sf::Vector3f clr);
+        void addSource(size_t x, size_t y, float size, Vec3 clr);
         
         void swapDensity();
         

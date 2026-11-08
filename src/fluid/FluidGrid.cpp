@@ -5,7 +5,8 @@
 #include <thread>
 #include <algorithm>
 #include <cmath>
-#include <SFML/System/Time.hpp>
+#include <cassert>
+#include <stdexcept>
 
 
 FluidGrid::FluidGrid(std::size_t width, std::size_t height, std::vector<Emitter*> emitters, int seed, bool threaded):
@@ -150,25 +151,25 @@ void FluidGrid::update(float dt){
 
     
     //Create noise scalar field
-    m_performance_clock.restart();
+    m_performance_clock.restartMs();
     calcNoise(dt);
 
-    m_noise_ms = m_performance_clock.restart().asMicroseconds()/1000.f;
+    m_noise_ms = m_performance_clock.restartMs();
     
     
     //Create vel gradient field based on noise
-    m_performance_clock.restart();
+    m_performance_clock.restartMs();
     m_mult_threaded ? calcVel_Threaded(dt) : calcVel_Rows(dt, 1, m_height-1);
 
-    m_vel_ms = m_performance_clock.restart().asMicroseconds()/1000.f;
+    m_vel_ms = m_performance_clock.restartMs();
     
     // apply velocity boundary calculations
     
     //Advect velocity
     swapVel();
-    m_performance_clock.restart();
+    m_performance_clock.restartMs();
     m_mult_threaded ? advectVel_Threaded(dt) : advectVel_Rows(dt, 1,m_height-1);
-    m_advectVel_ms = m_performance_clock.restart().asMicroseconds()/1000.f;
+    m_advectVel_ms = m_performance_clock.restartMs();
     
     velBoundaries();
     
@@ -179,39 +180,39 @@ void FluidGrid::update(float dt){
     velBoundaries();
 
     //second pressure solve
-    sf::Clock projectionClock;
+    PerformanceClock projectionClock;
     projectStep();
-    m_project_ms = projectionClock.getElapsedTime().asMicroseconds()/1000.f;
+    m_project_ms = projectionClock.elapsedMs();
    // decayVel();  
 
     //Add density source
-    m_performance_clock.restart();
+    m_performance_clock.restartMs();
 
     for( auto& emitter : m_emitters){
 
         addSource(emitter->m_pos.x, emitter->m_pos.y, emitter->m_rad, emitter->m_clr);
     }
 
-    m_addSource_ms = m_performance_clock.restart().asMicroseconds()/1000.f;
+    m_addSource_ms = m_performance_clock.restartMs();
     
     //Diffuse
     swapDensity();
-    m_performance_clock.restart();
+    m_performance_clock.restartMs();
     diffuse(dt, m_density_r_prev, m_density_r);
     diffuse(dt, m_density_g_prev, m_density_g);
     diffuse(dt, m_density_b_prev, m_density_b);
-    m_diffuse_ms = m_performance_clock.restart().asMicroseconds()/1000.f;
+    m_diffuse_ms = m_performance_clock.restartMs();
     
     //Advect
     swapDensity();
-    m_performance_clock.restart();
+    m_performance_clock.restartMs();
     m_mult_threaded ? advect_decay_Threaded(dt, m_density_r_prev, m_density_r) : advect_decay_Rows(dt, m_density_r_prev, m_density_r, 1,m_height-1);
     m_mult_threaded ? advect_decay_Threaded(dt, m_density_g_prev, m_density_g) : advect_decay_Rows(dt, m_density_g_prev, m_density_g, 1,m_height-1);
     m_mult_threaded ? advect_decay_Threaded(dt, m_density_b_prev, m_density_b) : advect_decay_Rows(dt, m_density_b_prev, m_density_b, 1,m_height-1);
     scalarBoundaries(m_density_r);
     scalarBoundaries(m_density_g);
     scalarBoundaries(m_density_b);
-    m_advect_ms = m_performance_clock.restart().asMicroseconds()/1000.f;
+    m_advect_ms = m_performance_clock.restartMs();
 
     //generate pixels
     #ifdef ENABLE_RENDERER
@@ -355,7 +356,7 @@ void FluidGrid::reset_density(){
 };
 void FluidGrid::projectStep(){
     //clearPressure();
-    m_performance_clock.restart();
+    m_performance_clock.restartMs();
     if(m_mult_threaded){
         calcDivergence_Threaded();
     }
@@ -363,18 +364,18 @@ void FluidGrid::projectStep(){
         calcDivergence_Rows(1,m_height-1);
     }
 
-    m_div_ms = m_performance_clock.restart().asMicroseconds()/1000.f;
-    
-    
-    m_performance_clock.restart();
+    m_div_ms = m_performance_clock.restartMs();
+
+
+    m_performance_clock.restartMs();
 
     //switch for turning on multithreaded mode
     m_mult_threaded ? solvePressureThreaded() : solvePressure();
 
-    m_pressure_ms = m_performance_clock.restart().asMicroseconds()/1000.f;
+    m_pressure_ms = m_performance_clock.restartMs();
     pressureBoundaries();
     
-    //m_performance_clock.restart();
+    //m_performance_clock.restartMs();
     if(m_mult_threaded){
         project_Threaded();
     }
@@ -532,7 +533,7 @@ void FluidGrid::swapDensity(){
 }
 
 
-void FluidGrid::addSource(size_t x, size_t y, float size, sf::Vector3f clr){
+void FluidGrid::addSource(size_t x, size_t y, float size, Vec3 clr){
 
    
     for(int dy = -size; dy<=size; dy++){
@@ -1122,6 +1123,3 @@ std::pair<float,float> FluidGrid::vel_sample(float x, float y) const{
         return{u_vel, v_vel};
 
 }
-
-
-

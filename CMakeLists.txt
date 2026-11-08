@@ -9,7 +9,7 @@ if(ENABLE_CUDA)
     find_package(CUDAToolkit REQUIRED)
 endif()
 
-find_package(SFML 3 REQUIRED COMPONENTS Graphics Window System)
+find_package(Threads REQUIRED)
 
 # Fluid computation.
 add_library(fluid_core STATIC
@@ -17,14 +17,7 @@ add_library(fluid_core STATIC
     src/fluid/Emitter.cpp
 )
 
-target_link_libraries(fluid_core 
-PUBLIC
-SFML::System
-PRIVATE
-    SFML::Graphics
-    SFML::Window
-
-)
+target_link_libraries(fluid_core PUBLIC Threads::Threads)
 
 
 
@@ -83,10 +76,10 @@ endif()
 
 # Optional rendering and UI.
 if(ENABLE_RENDERER)
+    find_package(SFML 3 REQUIRED COMPONENTS Graphics Window System)
 
     target_sources(vehicle_sim PRIVATE
         src/vehicle/renderer.cpp
-        src/fluid/FluidGrid.cpp
         src/fluid/Slider.cpp
     )
 
@@ -96,6 +89,7 @@ if(ENABLE_RENDERER)
         SFML::System
     )
 
+    target_compile_definitions(fluid_core PRIVATE ENABLE_RENDERER)
     target_compile_definitions(vehicle_sim PRIVATE
         ENABLE_RENDERER
         "FLUID_FONT_PATH=\"${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/RobotoMono.ttf\""
