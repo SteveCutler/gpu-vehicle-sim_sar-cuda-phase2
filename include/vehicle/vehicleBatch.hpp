@@ -8,6 +8,9 @@
 
 class vehicleBatch
 {
+    // The CUDA backend uploads/downloads the existing CPU state.
+    friend class CUDA_simulation;
+
 
 private:
     std::vector<float> m_x, m_y;
@@ -36,4 +39,3 @@ private:
 
 
 // TO DO write update function
-

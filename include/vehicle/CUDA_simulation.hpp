@@ -1,23 +1,23 @@
 #pragma once
 #include <cstddef>
 #include <cuda_runtime.h>
-#include "vehicle/vehicleBatch_CUDA.hpp"
-#include "vehicle/environment_CUDA.hpp"
-#include "vehicle/ProbabilityMap_CUDA.hpp"
-#include "vehicle/controller_CUDA.hpp"
-#include "vehicle/dynamics_CUDA.hpp"
+#include "vehicle/vehicleBatch.hpp"
+#include "vehicle/environment.hpp"
+#include "vehicle/ProbabilityMap.hpp"
+#include "vehicle/controller.hpp"
+#include "vehicle/dynamics.hpp"
 #include "vehicle/vehicleTypes.hpp"
-#include "vehicle/SearchPlanner_CUDA.hpp"
+#include "vehicle/SearchPlanner.hpp"
 
 
 class CUDA_simulation
 {
 public:
-    CUDA_simulation(SearchPlanner_CUDA& planner, 
+    CUDA_simulation(SearchPlanner& planner,
         DriftItem& target, 
-        ProbabilityMap_CUDA& p_map,
-        ProbabilityMap_CUDA& temp_map,
-        environment_CUDA& env,
+        ProbabilityMap& p_map,
+        ProbabilityMap& temp_map,
+        environment& env,
         std::size_t N,
         float dt):
         planner_(planner),
@@ -34,26 +34,26 @@ public:
 
     ~CUDA_simulation();
 
-    void runCudaSimulation(vehicleBatch_CUDA& vehicles, std::size_t steps);
-    void init_simulation(vehicleBatch_CUDA& vehicles);
-    void HtD_vehicles(const vehicleBatch_CUDA& vehicles);
-    void DtH_vehicles(vehicleBatch_CUDA& vehicles);
+    std::size_t runCudaSimulation(vehicleBatch& vehicles, std::size_t steps);
+    void init_simulation(vehicleBatch& vehicles);
+    void HtD_vehicles(const vehicleBatch& vehicles);
+    void DtH_vehicles(vehicleBatch& vehicles);
     void step_vehicles();
     
     void HtD_fluid();
     void DtH_fluid();
 
     //init objects
-    ControllerCuda controller;
-    DynamicsCuda dynamics;
+    Controller controller;
+    Dynamics dynamics;
     VehicleState vs{};
     Action action{};
     VehicleState newState{};
-    SearchPlanner_CUDA& planner_;
+    SearchPlanner& planner_;
     DriftItem& target_;
-    ProbabilityMap_CUDA& p_map_;
-    ProbabilityMap_CUDA& temp_map_;
-    environment_CUDA& env_;
+    ProbabilityMap& p_map_;
+    ProbabilityMap& temp_map_;
+    environment& env_;
 
 
 private:
@@ -81,5 +81,3 @@ private:
     float dt_;
 
 };
-
-

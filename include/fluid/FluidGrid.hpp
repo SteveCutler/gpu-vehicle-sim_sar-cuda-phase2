@@ -22,6 +22,9 @@ struct DivergenceStats {
 
 class FluidGrid
     {
+    // The CUDA backend uploads/downloads the existing CPU state.
+    friend class CUDA_simulation;
+
         friend struct ScalarBoundaryTestAccess;
 
     public:

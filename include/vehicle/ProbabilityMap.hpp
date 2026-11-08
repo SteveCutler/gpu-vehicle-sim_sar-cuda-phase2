@@ -8,6 +8,9 @@
 
 class ProbabilityMap
 {
+    // The CUDA backend uploads/downloads the existing CPU state.
+    friend class CUDA_simulation;
+
 private:
 DriftDynamics DD_;
 std::mt19937 rng_;
@@ -42,4 +45,3 @@ public:
 
     ~ProbabilityMap() = default;
 };
-

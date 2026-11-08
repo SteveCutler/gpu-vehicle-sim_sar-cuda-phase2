@@ -9,7 +9,7 @@ horizon_(horizon),
 w_index_(0)
 {
     // + 1 because the first index is the current position
-    forecast_.resize(horizon_);
+    forecast_.resize(horizon_ + 1);
 }
 
 std::pair<float,float> SearchPlanner::chooseWaypoint(VehicleState vs, 

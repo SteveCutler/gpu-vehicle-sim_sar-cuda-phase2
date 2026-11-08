@@ -1,12 +1,12 @@
 #include <cuda_runtime.h>
 #include "vehicle/CUDA_simulation.hpp"
 #include <cuda/std/utility>
-#include "vehicle/environment_CUDA.hpp"
+#include "vehicle/environment.hpp"
 #include "vehicle/controller_CUDA.hpp"
 #include "vehicle/dynamics_CUDA.hpp"
 #include "vehicle/vehicleTypes.hpp"
 
-#include "vehicle/SearchPlanner_CUDA.hpp"
+#include "vehicle/SearchPlanner.hpp"
 
 
 
@@ -133,7 +133,7 @@ __global__ void updateVehicles(float* vs_x,
     return;
 }
 
-void CUDA_simulation::HtD_vehicles(const vehicleBatch_CUDA& vehicles){
+void CUDA_simulation::HtD_vehicles(const vehicleBatch& vehicles){
     //create devices and allocate vehicle data
         const std::size_t floatBytes = this->v_count_ * sizeof(float);
      
@@ -156,7 +156,7 @@ void CUDA_simulation::HtD_vehicles(const vehicleBatch_CUDA& vehicles){
 
 }
 
-void CUDA_simulation::DtH_vehicles(vehicleBatch_CUDA& vehicles){
+void CUDA_simulation::DtH_vehicles(vehicleBatch& vehicles){
     const std::size_t floatBytes = v_count_ * sizeof(float);
 
     //copy vehicle data from device to host
@@ -214,7 +214,7 @@ void CUDA_simulation::DtH_fluid(){
 }
 
 void CUDA_simulation::init_simulation( 
-    vehicleBatch_CUDA& vehicles){
+    vehicleBatch& vehicles){
         
         //init cel count
        // this->cell_count_ = cell_count;
@@ -277,8 +277,8 @@ void CUDA_simulation::step_vehicles(){
 
 }
 
-void CUDA_simulation::runCudaSimulation(
-    vehicleBatch_CUDA& vehicles,
+std::size_t CUDA_simulation::runCudaSimulation(
+    vehicleBatch& vehicles,
     std::size_t steps){
 
 
@@ -349,6 +349,7 @@ void CUDA_simulation::runCudaSimulation(
         }
 
         if (target_found) {
+            ++curr_step;
             break;
         }
         
@@ -370,6 +371,7 @@ void CUDA_simulation::runCudaSimulation(
 
     }
 
+    return curr_step;
 };
 
 CUDA_simulation::~CUDA_simulation(){
@@ -393,6 +395,3 @@ CUDA_simulation::~CUDA_simulation(){
         cudaFree(ptr);
     }
 }
-
-
-    
