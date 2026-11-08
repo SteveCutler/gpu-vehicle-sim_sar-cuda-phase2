@@ -92,8 +92,8 @@ __global__ void updateVehicles(float* vs_x,
     }
 
     //allocating variables outside hot loop
-    ControllerCuda controller,
-    DynamicsCuda dynamics, 
+    ControllerCuda controller;
+    DynamicsCuda dynamics;
     VehicleState vs;
     Action action;
     VehicleState newState;
