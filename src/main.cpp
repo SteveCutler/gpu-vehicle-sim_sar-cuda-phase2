@@ -167,82 +167,53 @@ int main(int argNum, char* argVals[]){
             }
         else{
             while(curr_step < steps){
+                // Advance the entire batch before scanning, matching the GPU kernel.
+                for(std::size_t x = 0; x < N; ++x){
+                    vs = vehicles.load(x);
+                    action = controller.steer_controller(vs);
+                    newState = dynamics.step_update(vs, action, env, dt, curr_step);
+                    vehicles.set(x, newState);
+                }
 
-                //FLUID UPDATE
+                // Process sensor updates in the same vehicle order as the CUDA path.
+                for(std::size_t x = 0; x < N; ++x){
+                    newState = vehicles.load(x);
+                    target_found = vehicles.scan(newState, p_map, target);
 
-                if(target_found){break;}
-
-
-                
-
-                    //VEHICLE UPDATE
-                    //loop over every vehicle every step
-                    for(int x = 0; x < N; x++){
-                        //load vehicle state
-                        vs = vehicles.load(x);
-            
-                        //pass to controller 
-                        
-                        // must write controller logic still
-                        action = controller.steer_controller(vs);
-        
-                        //calculate new state
-                        newState = dynamics.step_update(vs, action, env, dt, curr_step);
-        
-                        //scan for goal/kill particles
-                        target_found = vehicles.scan(newState, p_map, target);
-        
-                        if(target_found){break;}
-        
-                        //run planner every 50 steps
-                        if(curr_step % 50 == 0 && curr_step != 0){
-                            //choose waypoint based on particle drift predictions
-                            
-                            std::pair<float,float> newWP = planner.chooseWaypoint(vs, 
-                                p_map.particles_, 
-                                env, 
-                                dt, 
-                                tempMap,
-                                dynamics,
-                                controller,
-                                height);
-                            //update waypoint
-                            newState.goalx = newWP.first;
-                            newState.goaly = newWP.second;
-        
-                        // std::cout << "Updating WP to: {" << newState.goalx << ", " << newState.goaly << "}" << std::endl;
-        
-                            
-                        }
-                        
-                        //update old state
+                    if(target_found){
                         vehicles.set(x, newState);
-        
+                        break;
                     }
-        
-                    //update target location
-                    driftDynamics.DriftUpdate(target, env.getDisturbance(target.x, target.y, 0.0f), dt);
-        
-                    //update probability particles
-                    p_map.update(env, dt);
-        
-                    //compute probability
-                    p_map.computeProb();
-        
-                    env.update_fluid(dt);
-        
-                //optionally display data
+
+                    if(curr_step % 50 == 0 && curr_step != 0){
+                        const auto newWP = planner.chooseWaypoint(
+                            newState, p_map.particles_, env, dt, tempMap,
+                            dynamics, controller, height);
+                        newState.goalx = newWP.first;
+                        newState.goaly = newWP.second;
+                    }
+                    vehicles.set(x, newState);
+                }
+
+                // All vehicles advanced once, even when this step finds the target.
+                if(target_found){
+                    ++curr_step;
+                    break;
+                }
+
+                driftDynamics.DriftUpdate(
+                    target, env.getDisturbance(target.x, target.y, 0.0f), dt);
+                p_map.update(env, dt);
+                p_map.computeProb();
+                env.update_fluid(dt);
+                ++curr_step;
+
                 #ifdef ENABLE_RENDERER
-                    bool running = renderer.draw(vehicles, dt, curr_step, env, target, p_map);
-                    if(!running) {
+                    if(!renderer.draw(vehicles, dt, curr_step, env, target, p_map)){
                         break;
                     }
                 #endif
-                
-                        //increment step counter
-                        curr_step++;
-                }
-
+            }
         }
 
         //end clock
