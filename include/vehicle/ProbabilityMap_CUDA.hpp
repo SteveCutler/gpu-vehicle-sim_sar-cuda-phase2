@@ -6,7 +6,7 @@
 #include "vehicle/DriftDynamics.hpp"
 #include "vehicle/vehicleTypes.hpp"
 
-class ProbabilityMap
+class ProbabilityMap_CUDA
 {
 private:
 std::mt19937 rng_;
@@ -26,7 +26,7 @@ public:
     std::vector<std::size_t>occupied_cells;
     
 public:
-    ProbabilityMap(DriftDynamics& DD, ::size_t width, std::size_t height, std::size_t num_p, float est_x, float est_y, float p_rad, std::size_t cell_size);
+    ProbabilityMap_CUDA(DriftDynamics& DD, ::size_t width, std::size_t height, std::size_t num_p, float est_x, float est_y, float p_rad, std::size_t cell_size);
 
     void update(const environment& env, float dt);
     
@@ -40,6 +40,6 @@ public:
 
     void particleScan(VehicleState& vs);
 
-    ~ProbabilityMap() = default;
+    ~ProbabilityMap_CUDA() = default;
 };
 

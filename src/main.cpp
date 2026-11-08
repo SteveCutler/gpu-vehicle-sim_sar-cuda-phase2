@@ -29,6 +29,8 @@
 
 #ifdef ENABLE_CUDA
 #include <cuda_runtime.h>
+#include "vehicle/ProbabilityMap_CUDA.hpp"
+#include "vehicle/SearchPlanner_CUDA.hpp"
 #include "vehicle/CUDA_simulation.hpp"
 #endif
 
@@ -149,7 +151,9 @@ int main(int argNum, char* argVals[]){
 
     #ifdef ENABLE_CUDA
         SearchPlanner_CUDA planner_cuda(50);
-        CUDA_simulation CudaSim(planner_cuda, target, p_map, tempMap, env, N, dt);
+        ProbabilityMap_CUDA p_map_cuda(driftDynamics, width, height, particle_count, target.x, target.y, prob_rad, cell_size);
+        ProbabilityMap_CUDA tempMap_cuda(driftDynamics, width, height, particle_count, target.x, target.y, prob_rad, cell_size);
+        CUDA_simulation CudaSim(planner_cuda, target, p_map_cuda, tempMap_cuda, env, N, dt);
         CudaSim.init_simulation(
             vehicles
         );

@@ -15,8 +15,8 @@ class CUDA_simulation
 public:
     CUDA_simulation(SearchPlanner_CUDA& planner, 
         DriftItem& target, 
-        ProbabilityMap& p_map,
-        ProbabilityMap& temp_map,
+        ProbabilityMap_CUDA& p_map,
+        ProbabilityMap_CUDA& temp_map,
         environment& env,
         std::size_t N,
         float dt):
@@ -51,8 +51,8 @@ public:
     VehicleState newState{};
     SearchPlanner_CUDA& planner_;
     DriftItem& target_;
-    ProbabilityMap& p_map_;
-    ProbabilityMap& temp_map_;
+    ProbabilityMap_CUDA& p_map_;
+    ProbabilityMap_CUDA& temp_map_;
     environment& env_;
 
 
