@@ -234,6 +234,10 @@ int main(int argNum, char* argVals[]){
             //output file name for correctness comparison
             if (argNum > 3) {
                 exportStates(vehicles, argVals[3]);
+
+                exportParticles(
+                    p_map.particles_,
+                    std::string(argVals[3]) + ".particles.csv");
             }
             
 
