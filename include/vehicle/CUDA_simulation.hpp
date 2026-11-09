@@ -20,8 +20,7 @@ public:
         ProbabilityMap& temp_map,
         environment& env,
         std::size_t N,
-        float dt,
-        float sensor_radius):
+        float dt):
         planner_(planner),
         target_(target),
         p_map_(p_map),
