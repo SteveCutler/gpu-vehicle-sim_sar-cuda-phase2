@@ -70,8 +70,8 @@ void ProbabilityMap::particleScan(VehicleState& vs){
         float x_pos = it->pos.x;
         float y_pos = it->pos.y;
 
-        float x_dist = abs(x_pos - vs.x);
-        float y_dist = abs(y_pos - (height_ - vs.y));
+        float x_dist = x_pos - vs.x;
+        float y_dist = y_pos - (height_ - vs.y);
 
         
         if(x_dist*x_dist + y_dist*y_dist < (vs.sensor_rad*2)*(2* vs.sensor_rad)){
