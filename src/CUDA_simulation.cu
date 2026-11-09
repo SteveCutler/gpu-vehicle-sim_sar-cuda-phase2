@@ -179,8 +179,8 @@ void CUDA_simulation::init_simulation(
         
         //init cel count
        // this->cell_count_ = cell_count;
-       if(vehicles.size() != 0){
-           this->sensor_radius = vehicles[0].m_sensor_rad;
+       if(this->v_count_ != 0){
+           this->sensor_radius_ = vehicles.m_sensor_rad;
        }
 
        //calculate space requirements for the different devices
@@ -417,26 +417,26 @@ std::size_t CUDA_simulation::runCudaSimulation(
         //copy vehicle data back for comparison
         DtH_vehicles(vehicles);
 
-        //CPU checks if target or goal are inside sensor radius
-        target_found = vehicles.targetCheck(vehicles, this->target_, env_.m_height);
-
+        
         particle_scan();
-
-        if (target_found) {
-            vehicles.set(v, vs);
-            break;
-        }
-
-        vehicles.goalCheck(vehicles, this->p_map_);
-
+        
         //particle scan
-
-
-    
+        
+        
+        
         //scan for goal/kill particles
         for(int v = 0; v < this->v_count_; v++){
             vs = vehicles.load(v);
-
+            
+            //CPU checks if target or goal are inside sensor radius
+            target_found = vehicles.targetCheck(vs, this->target_, env_.m_height);
+            
+            if (target_found) {
+                vehicles.set(v, vs);
+                break;
+            }
+    
+            vehicles.goalCheck(vs, this->p_map_);
     
     
             //run planner every 50 steps
@@ -505,11 +505,11 @@ CUDA_simulation::~CUDA_simulation(){
         d_v_,
         d_u_prev_,
         d_v_prev_,
-        d_particles_,
-        d_remove_particles_     
     };
-
+    
     for (float* ptr : allocations){
         cudaFree(ptr);
     }
+    cudaFree(d_particles_);
+    cudaFree(d_remove_particles_);    
 }
