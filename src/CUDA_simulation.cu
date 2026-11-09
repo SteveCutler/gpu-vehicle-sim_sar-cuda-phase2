@@ -180,7 +180,7 @@ void CUDA_simulation::init_simulation(
         //init cel count
        // this->cell_count_ = cell_count;
        if(this->v_count_ != 0){
-           this->sensor_radius_ = vehicles.m_sensor_rad;
+           this->sensor_radius_ = vehicles.m_sensor_rad[0];
        }
 
        //calculate space requirements for the different devices
