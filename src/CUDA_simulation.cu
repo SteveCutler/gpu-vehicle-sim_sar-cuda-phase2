@@ -67,11 +67,27 @@ __device__ cuda::std::pair<float,float> vel_sample(
 
 }
 
+
+__device__ bool scan_helper(
+    const float px, 
+    const float py, 
+    const float vs_x, 
+    const float vs_y, 
+    const float sensor_radius){
+
+    
+    float dist = (px - vs_x) * (px - vs_x) + (py - vs_y) * (py - vs_y);
+    if(dist < (sensor_radius*2*sensor_radius*2)){
+        return true;
+    }
+    return false;
+}
+
 __global__ void particle_scan_kernel(
-    PredictionParticle* d_particles_, 
+    const PredictionParticle* d_particles_, 
     unsigned char* d_remove_particles_, 
-    float* vs_x, 
-    float* vs_y, 
+    const float* vs_x, 
+    const float* vs_y, 
     float sensor_radius_, 
     std::size_t v_count_,
     std::size_t p_count_,
@@ -87,18 +103,14 @@ __global__ void particle_scan_kernel(
 
         //every thread takes a particle
         float p_x_pos = d_particles_[idx].pos.x;
-        float p_y_pos = d_particles_[idx].pos.y;
+        float p_y_pos = height - d_particles_[idx].pos.y;
         //detection sentinel
         unsigned char detected = 0;
-        float dist;
         
 
         //loop through all vehicles to determine if particle is within any sensor radius
         for(int v = 0; v < v_count_; v++){
-            dist = (p_x_pos - vs_x[v]) * (p_x_pos - vs_x[v]) + (p_y_pos - (height - vs_y[v])) * (p_y_pos - (height - vs_y[v]));
-
-            //
-            if(dist < (sensor_radius_*2*sensor_radius_*2)){
+            if(scan_helper(p_x_pos, p_y_pos, vs_x[v], vs_y[v], sensor_radius_)){
                 detected = 1;
                 break;
             }
@@ -174,6 +186,49 @@ __global__ void updateVehicles(float* vs_x,
     return;
 }
 
+__global__ void p_horizons(
+    const PredictionParticle* particles, 
+    PredictionParticle* forecasts,
+    const float* d_u_prev,
+    const float* d_v_prev,
+    std::size_t steps,
+    std::size_t p_count,
+    std::size_t height,
+    std::size_t width,
+    float dt
+){
+
+    int idx = threadIdx.x + blockDim.x * blockIdx.x;
+    
+    if(idx >= p_count){
+        return;
+    }
+    
+    //write the first position to forecasts as step 0
+    PredictionParticle particle = particles[idx];
+    forecasts[idx] = particle; 
+
+    //advance particle through all steps and write to return array
+
+    for(int s = 1; s < step; s++){
+        
+        
+        //use vel sample device function to sample curent at pos
+        cuda::std::pair<float, float> current = vel_sample(d_u_prev, 
+                                                d_v_prev, 
+                                                width, 
+                                                height, 
+                                                particles.pos.x, 
+                                                particles.pos.y);
+
+                                                //advect particles using current sample
+        particle.pos.x += current.first * dt;
+        particle.pos.y += current.second * dt;
+
+        forecasts[idx + (s * p_count)] = particle;
+    }
+
+}
 void CUDA_simulation::init_simulation( 
     vehicleBatch& vehicles){
         
@@ -189,6 +244,8 @@ void CUDA_simulation::init_simulation(
        //particles are AoS layout
        const std::size_t pBytes = this->p_map_.particles_.size() * sizeof(PredictionParticle);
        const std::size_t flagBytes = this->p_map_.particles_.size() * sizeof(unsigned char);
+       const std::size_t p_horizons_Bytes = this->p_map_.particles_.size() * (this->planner_.horizon_ + 1) * sizeof(PredictionParticle);
+
        
        //allocate devices for vehicle batch data, allocate here and copy over in HtDvehicles function
         cudaMalloc(&this->vs_x, floatBytes);
@@ -211,6 +268,8 @@ void CUDA_simulation::init_simulation(
         //allocate memory to particle device
         cudaMalloc(&this->d_particles_, pBytes);
         cudaMalloc(&this->d_remove_particles_, flagBytes);
+        cudaMalloc(&this->d_p_horizons, p_horizons_Bytes);
+
 
 }
 
@@ -379,6 +438,47 @@ void CUDA_simulation::step_vehicles(){
 
 }
 
+void CUDA_simulation::calc_p_horizon(std::size_t steps){
+    
+    //need horizon device holder
+
+    std::size_t steps = this->planner_.horizon_ + 1;
+    std::size_t p_count = p_map_.particles_.size();
+
+    //create vector to hold returned horizons
+    std::vector<PredictionParticle> p_horizons;
+    p_horizons.resize(p_count * steps );
+
+    //fluid devices still contain appropriate data
+
+    std::size_t threads = 128;
+    std::size_t blocks = (p_count + threads - 1)/threads;
+
+    //kernel laucnh
+
+    p_horizons<<<blocks, threads>>>(
+        this->d_particles_, 
+        this->d_p_horizons,
+        this->d_u_prev_,
+        this->d_v_prev_,
+        steps,
+        p_count,
+        this->env_.m_height,
+        this->env_.m_width,
+        this->dt_);
+
+        //copy data back over
+
+        cudaMemcpy(p_horizons.data(), 
+        this->d_p_horizons, 
+        p_count * steps * sizeof(PredictionParticle), 
+        cudaMemcpyDeviceToHost);
+
+
+    
+
+}
+
 std::size_t CUDA_simulation::runCudaSimulation(
     vehicleBatch& vehicles,
     std::size_t steps){
@@ -436,6 +536,21 @@ std::size_t CUDA_simulation::runCudaSimulation(
     
             //run planner every 50 steps
             if(curr_step % 50 == 0 && curr_step != 0){
+
+
+                //break operation into 4 seperate kernels ->
+
+                //particle horizon forecast
+                calc_p_horizon(this->planner_.horizon_);
+
+                //build midpoint/endpoint occupancy maps and return candidate paths
+                calc_candidate_waypoints(this->planner_.horizon_);
+
+                //vehicle rollouts to predict highest return path
+
+                //
+
+
                 //choose waypoint based on particle drift predictions
                 
                 std::pair<float,float> newWP = this->planner_.chooseWaypoint(
@@ -446,13 +561,14 @@ std::size_t CUDA_simulation::runCudaSimulation(
                     this->temp_map_,
                     this->dynamics,
                     this->controller,
-                    this->env_.m_height);
+                    this->env_.m_height
+                    );
+
+
                 //update waypoint
                 vs.goalx = newWP.first;
                 vs.goaly = newWP.second;
-    
-                // std::cout << "Updating WP to: {" << newState.goalx << ", " << newState.goaly << "}" << std::endl;
-    
+
                 
             }
             //update old state

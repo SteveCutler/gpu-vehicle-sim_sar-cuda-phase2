@@ -40,11 +40,12 @@ public:
     void HtD_vehicles(const vehicleBatch& vehicles);
     void DtH_vehicles(vehicleBatch& vehicles);
     void step_vehicles();
+    void calc_p_horizon();
     
     void HtD_fluid();
     void DtH_fluid();
 
-    void particle_scan();
+    void particle_scan(std::size_t steps);
 
     
 
@@ -85,6 +86,7 @@ private:
     //particle device pointer
     PredictionParticle* d_particles_ = nullptr;
     unsigned char* d_remove_particles_ = nullptr;
+    PredictionParticle* d_p_horizons = nullptr;
 
     std::size_t cell_count_ = 0;
     std::size_t v_count_;
