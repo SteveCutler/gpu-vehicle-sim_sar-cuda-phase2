@@ -26,10 +26,6 @@ add_Particles();
 
 void ProbabilityMap::update(const environment& env, float dt){
 
-   // add_Particles();
-
-    //update probability particle drift
-
     //scan for dead particles, if alive update dynamics
     for(auto it = particles_.begin(); it != particles_.end();){
         it->life_ -= dt;
@@ -41,8 +37,8 @@ void ProbabilityMap::update(const environment& env, float dt){
         }
     }
 
-
 };
+
 void ProbabilityMap::updateGoal(VehicleState& vs){
     std::size_t cols = width_ / cell_size_;
 

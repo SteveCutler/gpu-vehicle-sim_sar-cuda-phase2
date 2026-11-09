@@ -420,7 +420,6 @@ std::size_t CUDA_simulation::runCudaSimulation(
         
         particle_scan();
         
-        //particle scan
         
         
         
