@@ -67,6 +67,47 @@ __device__ cuda::std::pair<float,float> vel_sample(
 
 }
 
+__global__ void particle_scan_kernel(
+    PredictionParticle* d_particles_, 
+    unsigned char* d_remove_particles_, 
+    float* vs_x, 
+    float* vs_y, 
+    float sensor_radius_, 
+    std::size_t v_count_,
+    std::size_t p_count_,
+    std::size_t height
+    ){
+
+        int idx = threadIdx.x + blockDim.x * blockIdx.x;
+
+        //bounds check
+        if(idx >= p_count_){
+            return;
+        }
+
+        //every thread takes a particle
+        float p_x_pos = d_particles_[idx].pos.x;
+        float p_y_pos = d_particles_[idx].pos.y;
+        //detection sentinel
+        unsigned char detected = 0;
+        float dist;
+        
+
+        //loop through all vehicles to determine if particle is within any sensor radius
+        for(int v = 0; v < v_count_; v++){
+            dist = (p_x_pos - vs_x[v]) * (p_x_pos - vs_x[v]) + (p_y_pos - (height - vs_y[v])) * (p_y_pos - (height - vs_y[v]));
+
+            //
+            if(dist < (sensor_radius_*2*sensor_radius_*2)){
+                detected = 1;
+                break;
+            }
+        }
+        //write out detection flag
+        d_remove_particles_[idx] = detected;
+
+};
+
 __global__ void updateVehicles(float* vs_x, 
     float* vs_y, 
     float* vs_vx, 
@@ -133,6 +174,46 @@ __global__ void updateVehicles(float* vs_x,
     return;
 }
 
+void CUDA_simulation::init_simulation( 
+    vehicleBatch& vehicles){
+        
+        //init cel count
+       // this->cell_count_ = cell_count;
+       if(vehicles.size() != 0){
+           this->sensor_radius = vehicles[0].m_sensor_rad;
+       }
+
+       //calculate space requirements for the different devices
+       const std::size_t floatBytes = this->v_count_ * sizeof(float);
+       const std::size_t fluidBytes = this->env_.m_width * this->env_.m_height * sizeof(float);
+       //particles are AoS layout
+       const std::size_t pBytes = this->p_map_.particles_.size() * sizeof(PredictionParticle);
+       const std::size_t flagBytes = this->p_map_.particles_.size() * sizeof(unsigned char);
+       
+       //allocate devices for vehicle batch data, allocate here and copy over in HtDvehicles function
+        cudaMalloc(&this->vs_x, floatBytes);
+        cudaMalloc(&this->vs_y, floatBytes);
+        cudaMalloc(&this->vs_vx, floatBytes);
+        cudaMalloc(&this->vs_vy, floatBytes);
+        cudaMalloc(&this->vs_heading, floatBytes);
+        cudaMalloc(&this->vs_turnRate, floatBytes);
+        cudaMalloc(&this->vs_goalx, floatBytes);
+        cudaMalloc(&this->vs_goaly, floatBytes);
+        
+        
+        //allocate memory to devices for fluid fields
+        cudaMalloc(&this->d_u_, fluidBytes);
+        cudaMalloc(&this->d_v_, fluidBytes);
+        cudaMalloc(&this->d_u_prev_, fluidBytes);
+        cudaMalloc(&this->d_v_prev_, fluidBytes);
+
+
+        //allocate memory to particle device
+        cudaMalloc(&this->d_particles_, pBytes);
+        cudaMalloc(&this->d_remove_particles_, flagBytes);
+
+}
+
 void CUDA_simulation::HtD_vehicles(const vehicleBatch& vehicles){
     //create devices and allocate vehicle data
         const std::size_t floatBytes = this->v_count_ * sizeof(float);
@@ -177,6 +258,56 @@ void CUDA_simulation::DtH_vehicles(vehicleBatch& vehicles){
     }
 }
 
+void CUDA_simulation::particle_scan(){
+    
+    //calc particle num
+    const std::size_t p_count = p_map_.particles_.size();
+    auto& particles = p_map_.particles_;
+
+    if (p_count == 0) {
+        return;
+    }
+
+    std::vector<unsigned char> remove_particles(p_count);
+
+    //transfer particle data to GPU
+    cudaMemcpy(this->d_particles_, particles.data(), p_count*sizeof(PredictionParticle), cudaMemcpyHostToDevice);
+
+    int threads = 256;
+    int blocks = (p_count + threads - 1) / threads;
+
+    //launch GPU kernel -> send particle device, vehicle device, return list of particles to cull
+    particle_scan_kernel<<<blocks, threads>>>(
+        this->d_particles_, 
+        this->d_remove_particles_, 
+        this->vs_x, 
+        this->vs_y, 
+        this->sensor_radius_, 
+        this->v_count_, 
+        p_count,
+        static_cast<float>(env_.m_height)
+        );
+    
+    //transfer back hits and remove them from p_map.particles_
+    cudaMemcpy(remove_particles.data(), d_remove_particles_, sizeof(unsigned char) * p_count, cudaMemcpyDeviceToHost);
+
+    //remove collision particles
+    int write = 0;
+    for(int read = 0; read < particles.size(); read++){
+        if(remove_particles[read] == 0){
+            if(write != read){
+                particles[write] = particles[read];
+            }
+            write++;
+        }
+
+    }
+
+    particles.resize(write);
+    //later we can optimize by adding a binned cell based check
+
+
+}
 void CUDA_simulation::HtD_fluid(){
     //create devices and allocate vehicle data
         const std::size_t fluidBytes = this->env_.m_width * this->env_.m_height * sizeof(float);
@@ -213,36 +344,7 @@ void CUDA_simulation::DtH_fluid(){
     }
 }
 
-void CUDA_simulation::init_simulation( 
-    vehicleBatch& vehicles){
-        
-        //init cel count
-       // this->cell_count_ = cell_count;
 
-       
-       //allocate devices for vehicle batch data, allocate here and copy over in HtDvehicles function
-        const std::size_t floatBytes = this->v_count_ * sizeof(float);
-        cudaMalloc(&this->vs_x, floatBytes);
-        cudaMalloc(&this->vs_y, floatBytes);
-        cudaMalloc(&this->vs_vx, floatBytes);
-        cudaMalloc(&this->vs_vy, floatBytes);
-        cudaMalloc(&this->vs_heading, floatBytes);
-        cudaMalloc(&this->vs_turnRate, floatBytes);
-        cudaMalloc(&this->vs_goalx, floatBytes);
-        cudaMalloc(&this->vs_goaly, floatBytes);
-        
-        
-        //allocate memory to devices for fluid fields
-        const std::size_t fluidBytes = this->env_.m_width * this->env_.m_height * sizeof(float);
-        cudaMalloc(&this->d_u_, fluidBytes);
-        cudaMalloc(&this->d_v_, fluidBytes);
-        cudaMalloc(&this->d_u_prev_, fluidBytes);
-        cudaMalloc(&this->d_v_prev_, fluidBytes);
-
-
-        //handle particles
-
-}
 
 void CUDA_simulation::step_vehicles(){
         //threading setup
@@ -311,19 +413,31 @@ std::size_t CUDA_simulation::runCudaSimulation(
         HtD_fluid();
         //advance vehicles
         step_vehicles();
-        //copy vehicle data back
+
+        //copy vehicle data back for comparison
         DtH_vehicles(vehicles);
+
+        //CPU checks if target or goal are inside sensor radius
+        target_found = vehicles.targetCheck(vehicles, this->target_, env_.m_height);
+
+        particle_scan();
+
+        if (target_found) {
+            vehicles.set(v, vs);
+            break;
+        }
+
+        vehicles.goalCheck(vehicles, this->p_map_);
+
+        //particle scan
+
+
     
         //scan for goal/kill particles
         for(int v = 0; v < this->v_count_; v++){
             vs = vehicles.load(v);
 
-            target_found = vehicles.scan(vs, this->p_map_, this->target_);
     
-            if (target_found) {
-                vehicles.set(v, vs);
-                break;
-            }
     
             //run planner every 50 steps
             if(curr_step % 50 == 0 && curr_step != 0){
@@ -390,7 +504,9 @@ CUDA_simulation::~CUDA_simulation(){
         d_u_,
         d_v_,
         d_u_prev_,
-        d_v_prev_        
+        d_v_prev_,
+        d_particles_,
+        d_remove_particles_     
     };
 
     for (float* ptr : allocations){

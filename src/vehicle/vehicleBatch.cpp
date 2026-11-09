@@ -83,14 +83,42 @@ std::size_t vehicleBatch::getSize() const{
     return m_size;
 };
 
+bool vehicleBatch::targetCheck(const VehicleState& vs, const DriftItem& target, std::size_t height) const{
+    //check if target in sensor
+    float td_x = target.x - vs.x;
+    float td_y = (target.y) - (height - vs.y);
+    float target_dist = std::sqrt(td_x*td_x + td_y*td_y);
+
+    if(target_dist <= vs.sensor_rad*2){
+        std::cout << "Found target!" << std::endl;
+        return true;
+    }
+    return false;
+};
+
+void vehicleBatch::goalCheck(VehicleState& vs, ProbabilityMap& p_map){
+
+    //check if goal in sensor
+    float tg_x = vs.goalx - vs.x;
+    float tg_y = (p_map.height_ - vs.goaly) - (p_map.height_ - vs.y);
+    float goal_dist = std::sqrt(tg_x*tg_x + tg_y*tg_y);
+
+    if(goal_dist < vs.sensor_rad*2){
+
+        p_map.updateGoal(vs);
+        
+    }
+
+}
+
 bool vehicleBatch::scan(VehicleState& vs, ProbabilityMap& p_map, DriftItem& target){
 
-    //check if target in censor
+    //check if target in sensor
     float td_x = target.x - vs.x;
     float td_y = (target.y) - (p_map.height_ - vs.y);
     float target_dist = std::sqrt(td_x*td_x + td_y*td_y);
 
-    //check if goal in censor
+    //check if goal in sensor
     float tg_x = vs.goalx - vs.x;
     float tg_y = (p_map.height_ - vs.goaly) - (p_map.height_ - vs.y);
     float goal_dist = std::sqrt(tg_x*tg_x + tg_y*tg_y);

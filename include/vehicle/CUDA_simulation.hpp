@@ -8,6 +8,7 @@
 #include "vehicle/dynamics.hpp"
 #include "vehicle/vehicleTypes.hpp"
 #include "vehicle/SearchPlanner.hpp"
+#include "vehicle/DriftItem.hpp"
 
 
 class CUDA_simulation
@@ -19,7 +20,8 @@ public:
         ProbabilityMap& temp_map,
         environment& env,
         std::size_t N,
-        float dt):
+        float dt,
+        float sensor_radius):
         planner_(planner),
         target_(target),
         p_map_(p_map),
@@ -42,6 +44,10 @@ public:
     
     void HtD_fluid();
     void DtH_fluid();
+
+    void particle_scan();
+
+    
 
     //init objects
     Controller controller;
@@ -69,12 +75,17 @@ private:
     float* vs_turnRate = nullptr;
     float* vs_goalx = nullptr;
     float* vs_goaly = nullptr;
+    float sensor_radius_ = 0;
 
     //fluid pointer vars
     float* d_u_ = nullptr;
     float* d_v_ = nullptr;
     float* d_u_prev_ = nullptr;
     float* d_v_prev_ = nullptr;
+
+    //particle device pointer
+    PredictionParticle* d_particles_ = nullptr;
+    unsigned char* d_remove_particles_ = nullptr;
 
     std::size_t cell_count_ = 0;
     std::size_t v_count_;
