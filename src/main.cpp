@@ -175,15 +175,23 @@ int main(int argNum, char* argVals[]){
                     vehicles.set(x, newState);
                 }
 
+                for(std::size_t x = 0; x < N; ++x){
+                    vs = vehicles.load(x);
+                    p_map.particleScan(vs);
+                }
+
                 // Process sensor updates in the same vehicle order as the CUDA path.
                 for(std::size_t x = 0; x < N; ++x){
                     newState = vehicles.load(x);
-                    target_found = vehicles.scan(newState, p_map, target);
+
+                    //target_found = vehicles.scan(newState, p_map, target);
+                    target_found = vehicles.targetCheck(newState, target, height);
 
                     if(target_found){
                         vehicles.set(x, newState);
                         break;
                     }
+                    vehicles.goalCheck(newState, p_map);
 
                     if(curr_step % 50 == 0 && curr_step != 0){
                         const auto newWP = planner.chooseWaypoint(

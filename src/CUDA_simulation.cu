@@ -417,11 +417,7 @@ std::size_t CUDA_simulation::runCudaSimulation(
         //copy vehicle data back for comparison
         DtH_vehicles(vehicles);
 
-        
         particle_scan();
-        
-        
-        
         
         //scan for goal/kill particles
         for(int v = 0; v < this->v_count_; v++){
