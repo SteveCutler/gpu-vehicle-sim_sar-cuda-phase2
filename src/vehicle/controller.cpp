@@ -1,5 +1,5 @@
 #include "vehicle/controller.hpp"
-
+#include "vehicle/constants.hpp"
 
 #include <cmath>
 #include <algorithm>
@@ -19,9 +19,9 @@ Action Controller::steer_controller(const VehicleState& vs){
     const float headingError = std::remainder(desiredHeading - vs.heading, 2.0f * pi);
 
     //PD controls
-    constexpr float kp = 10.f;
-    constexpr float kd = 2.f;
-    constexpr float maxTorque = 10.f;
+    constexpr float kp = constants::kp;
+    constexpr float kd = constants::kd;
+    constexpr float maxTorque = constants::maxTorque;
 
     Action action{};
     action.torque = std::clamp(
@@ -30,10 +30,10 @@ Action Controller::steer_controller(const VehicleState& vs){
     );
 
     //create dynamic thrust
-    constexpr float distGain = 5.f;
-    constexpr float speedGain = 20.0f;
-    constexpr float maxSpeed = 20.f;
-    constexpr float maxThrust = 15.f;
+    constexpr float distGain = constants::distGain;
+    constexpr float speedGain = constants::speedGain;
+    constexpr float maxSpeed = constants::maxSpeed;
+    constexpr float maxThrust = constants::maxThrust;
 
     float distx = vs.x - vs.goalx;
     float disty = vs.y - vs.goaly;

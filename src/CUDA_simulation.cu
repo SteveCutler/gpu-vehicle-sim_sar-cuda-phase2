@@ -7,6 +7,7 @@
 #include "vehicle/vehicleTypes.hpp"
 #include <vector>
 #include "vehicle/SearchPlanner.hpp"
+#include "vehicle/constants.hpp"
 
 #include <iostream>
 
@@ -206,7 +207,7 @@ __global__ void p_horizons(
 
     //advance particle through all steps and write to return array
 
-    for(int s = 1; s < step; s++){
+    for(int s = 1; s < steps; s++){
         
         
         //use vel sample device function to sample curent at pos
@@ -277,13 +278,306 @@ __global__ void occupancy_kernel(
 
 };
 
-
-__global__ void path_kernel(
-
+__device__ Action controller_update(
+    const VehicleState& vs
 ){
+
+    constexpr float pi = 3.14159265359f;
+
+    //use arctangent to calculate desired heading angle
+    const float desiredHeading = atan2f(vs.goaly - vs.y, vs.goalx - vs.x);
+
+    //calculate shortest angle corrective between current heading and desired heading
+    const float headingError = remainderf(desiredHeading - vs.heading, 2.0f * pi);
+
+    //PD controls
+    constexpr float kp = constants::kp;
+    constexpr float kd = constants::kd;
+    constexpr float maxTorque = constants::maxTorque;
+
+     Action action{};
+    action.torque = fminf(maxTorque, fmaxf(
+        -maxTorque, kp * headingError - kd * vs.turnRate
+    ));
+
+    //create dynamic thrust
+    constexpr float distGain = constants::distGain;
+    constexpr float speedGain = constants::speedGain;
+    constexpr float maxSpeed = constants::maxSpeed;
+    constexpr float maxThrust = constants::maxThrust;
+
+    float distx = vs.x - vs.goalx;
+    float disty = vs.y - vs.goaly;
+    float dist = sqrtf(distx*distx + disty*disty);
+
+    //measure if pointing towards goal
+    float alignment = fmaxf(0.0f, cosf(headingError));
+
+    //clamp speed at max and multiply by direction pointing
+    float desiredSpeed = fminf(maxSpeed, dist * distGain) * alignment;
+
+    //measure actual speed
+    float actualSpeed = vs.vx * cosf(vs.heading) 
+                        + vs.vy * sinf(vs.heading);
+
+    //discrepency between desired and actual
+    float speedError = desiredSpeed - actualSpeed;
+
+    action.thrust = fminf(maxThrust,
+        fmaxf(-maxThrust, speedError * speedGain)
+    );
+
+    return action;
+}
+
+__device__ void dynamics_update(
+    VehicleState& vs,
+    const Action& action,
+    const float dt,
+    const float* d_u_prev,
+    const float* d_v_prev,
+    const std::size_t height,
+    const std::size_t width
+){
+
+    //initial params
+    constexpr float mass = constants::mass;
+    constexpr float momentOfInertia = constants::momentOfInertia;
+    constexpr float linearDrag = constants::linearDrag;
+    constexpr float turnDrag = constants::turnDrag;
+    constexpr float pi = 3.14159265359f;
+
+    //retrieve ocean disturbance at this position
+    cuda::std::pair<float, float> current = vel_sample(d_u_prev, 
+                                                    d_v_prev, 
+                                                    width, 
+                                                    height, 
+                                                    vs.x, 
+                                                    vs.y);
+
+
+    //Forces in x y coords
+    const float thrustX = action.thrust * cosf(vs.heading);
+    const float thrustY = action.thrust * sinf(vs.heading);
+
+    //current is 0 for this first implementation
+    const float relativeVx = vs.vx - current.first;
+    const float relativeVy = vs.vy - current.second;
+
+    //accel x and y
+    const float ax = (thrustX - linearDrag * relativeVx) / mass;
+    const float ay = (thrustY - linearDrag * relativeVy) / mass;
+
+    //angular accel
+    const float angularAcceleration = (action.torque - turnDrag * vs.turnRate) / momentOfInertia;
+
+    //copy old state to preserve the things we aren't changing
+    //VehicleState newVs = vs;
+
+    vs.vx = vs.vx + ax * dt;
+    vs.vy = vs.vy + ay * dt;
+    vs.x = vs.x + vs.vx * dt;
+    vs.y = vs.y + vs.vy * dt;
+
+    vs.turnRate = vs.turnRate + angularAcceleration * dt;
+    vs.heading = remainderf(vs.heading + vs.turnRate * dt, 2.f * pi);
 
 }
 
+
+__global__ void path_kernel(
+    //vehicle vars
+    float* vs_x,
+    float* vs_y, 
+    float* vs_vx, 
+    float* vs_vy, 
+    float* vs_heading, 
+    float* vs_turnRate, 
+    float* vs_goalx, 
+    float* vs_goaly, 
+    //fluid vars
+    const float* d_u_prev_, 
+    const float* d_v_prev_, 
+    //particle vars
+    const PredictionParticle* p_forecasts,
+    unsigned char* hit_map,
+    std::size_t p_count,
+    //candidate waypoints
+    const float* waypoints_x,
+    const float* waypoints_y,
+
+    const std::size_t v_count, 
+    const float dt,
+    const float sensor_rad,
+    const std::size_t wp_num,
+    const std::size_t height,
+    const std::size_t width,
+    const std::size_t steps
+
+
+){
+
+    int idx = threadIdx.x + blockDim.x * blockIdx.x;
+
+    if(idx >= p_count){
+        return;
+    }
+    VehicleState vs;
+    PredictionParticle particle;
+
+    //for every vehicle, 
+    for(int v = 0; v < v_count; v++){
+        
+        //for its waypoints, loop through every step, simulating the vehicle advancing towards the waypoint
+        for(int wp = 0; wp < wp_num; wp++){
+            //load vehicle original state to reset starting state for each wp run
+            vs = {
+                vs_x[v],
+                vs_y[v],
+                vs_vx[v],
+                vs_vy[v],
+                vs_heading[v],
+                vs_turnRate[v],
+                vs_goalx[v],
+                vs_goaly[v]
+            };
+            //first run keep the same but then update to new candidate waypoints after
+            if(wp != 0){
+                vs.goalx = waypoints_x[wp-1];
+                vs.goaly = waypoints_y[wp-1];
+            }
+
+            //calculate current offset for hitmap
+            unsigned int offset = (wp * p_count) + (v * wp_num * p_count);
+
+            //current step set to 0
+            hit_map[offset + idx] = 0;
+
+            //for each step calculate new vehicle pos given this waypoint
+            //loop starts at 1 to exclude current step
+            for(int s = 1; s < steps; s++){
+                //pass vehicle state by reference, this updates to new state
+                dynamics_update(vs,
+                    controller_update(vs),
+                    dt,
+                    d_u_prev_,
+                    d_v_prev_,
+                    height,
+                    width);
+
+                //for each particle check to see if it is in the sensor radius of the new vehicle state
+            
+                particle = p_forecasts[p_count * s + idx];
+                if(scan_helper(
+                    particle.pos.x,
+                    static_cast<float>(height) - particle.pos.y,
+                    vs.x,
+                    vs.y,
+                    sensor_rad
+                )){
+                    //particle collision has been found
+                    hit_map[idx + offset] = 1;
+                    break;
+                }
+                
+
+            }
+
+        }
+
+    }
+}
+
+__global__ void score_paths_kernel(
+    const unsigned char* hit_num,
+    const std::size_t wp_num,
+    const std::size_t v_count,
+    const std::size_t p_count,
+    unsigned int* best_wps,
+    const std::size_t smem_num
+){
+
+    extern __shared__ unsigned int sMem[];
+
+    
+    //first loop just fills in the smem, other loops compare
+    int idx = threadIdx.x;
+    
+    //each block has 256 threads and is used to calculate all rollouts for one vehicle
+    //
+    
+    if(blockIdx.x >= v_count){
+        return;
+    }
+    unsigned int hit_tally = 0;
+    unsigned int best_wp = 0;
+    
+    int warp_num = idx / 32;
+    int lane_num = idx % 32;
+    
+    int v_num = blockIdx.x;
+    unsigned int FULL_MASK = 0xFFFFFFFF;
+    std::size_t hit_offset;
+    
+    //loop over all wp for current vehicle
+    for(int wp = 0; wp < wp_num; wp++){
+        unsigned int local_hits = 0;
+        //calculate hit_offset, vehicle * waypoints * particle counts to access correct hit_num data
+        hit_offset = (v_num * wp_num + wp) * p_count;
+
+        //within current wp, threads only go up to p_coun
+
+        for(std::size_t tid = idx; tid < p_count; tid += blockDim.x){
+    
+    
+            //load hit data
+            local_hits += hit_num[tid+hit_offset];
+            
+        }        
+        
+        //add thread local tallys to sMem slots based on warp num
+        
+        //reduce warp level tallys
+        int offset = 1;
+        while(offset < 32){
+            local_hits += __shfl_down_sync(FULL_MASK, local_hits, offset);
+            offset*=2;
+        }
+        
+        if(lane_num == 0){
+            sMem[warp_num] = local_hits;
+        }
+        __syncthreads();
+        
+        //thread 1 reduces sMemresults and stores in register value
+        if(warp_num == 0){
+            //if lane in bounds for smem, load value, else get 0
+            unsigned int warp_total = lane_num < smem_num ? sMem[lane_num] : 0;
+            
+            offset = 1;
+            while(offset < 32){
+                warp_total += __shfl_down_sync(FULL_MASK, warp_total, offset);
+                offset *=2;
+            }
+            
+            if(lane_num == 0){
+                if(warp_total > hit_tally){
+                    best_wp = wp;
+                    hit_tally = warp_total;
+                }
+            }
+        }
+        __syncthreads();
+        
+    }
+
+    //afterwards tid 0 writes out best_wp to 
+    if(idx == 0){
+
+        best_wps[v_num] = best_wp;
+    }
+
+}
 
 void CUDA_simulation::init_simulation( 
     vehicleBatch& vehicles){
@@ -304,6 +598,9 @@ void CUDA_simulation::init_simulation(
         std::size_t steps = this->planner_.horizon_ + 1;
         std::size_t p_count = this->p_map_.particles_.size();
         std::size_t p_horizons_Bytes = p_count * steps * sizeof(PredictionParticle);
+
+        //hit map bytes
+        std::size_t hit_bytes = this->v_count_ * this->candidate_waypoints_ * p_count * sizeof(unsigned char);
 
        
        //allocate devices for vehicle batch data, allocate here and copy over in HtDvehicles function
@@ -331,16 +628,20 @@ void CUDA_simulation::init_simulation(
         
         //allocate space for particle horizons
         this->horizons_.resize(p_count * steps );
-        //allocate space for candidate waypoints
+        //allocate space for candidate waypoint calculations
         this->planner_.wayPoints.resize(this->candidate_waypoints_);
-        cudaMalloc(&this->d_waypoints, this->candidate_waypoints_*sizeof(std::pair<float,float>));
+        cudaMalloc(&this->d_waypoints_x, (this->candidate_waypoints_-1)*sizeof(float));
+        cudaMalloc(&this->d_waypoints_y, (this->candidate_waypoints_-1)*sizeof(float));
+        cudaMalloc(&this->d_best_wp, (this->v_count_ * sizeof(unsigned int)));
 
         //occupancy maps -> -1 because the first waypoint candidate is the current one
-        cudaMalloc(&this->d_occupancy_maps_, (cell_count_ * (this->candidate_waypoints_ - 1) * sizeof(unsigned int)))
+        this->cell_count_ = (env_.m_width / cell_size_) * (env_.m_height / cell_size_);
+        cudaMalloc(&this->d_occupancy_maps_, (cell_count_ * (this->candidate_waypoints_ - 1) * sizeof(unsigned int)));
         this->occupancy_maps_.resize(cell_count_ * (this->candidate_waypoints_ - 1));
 
         //calc number of cells
-        this->cell_count_ = (env_.m_width / cell_size_) * (env_.m_height / cell_size_);
+        //allocate space for hit maps for path calculations
+        cudaMalloc(&this->d_hit_map, hit_bytes);
 
 
 }
@@ -513,14 +814,19 @@ void CUDA_simulation::step_vehicles(){
 void CUDA_simulation::calc_p_horizon(std::size_t steps){
     
     //need horizon device holder
-
-    std::size_t steps = this->planner_.horizon_ + 1;
     std::size_t p_count = p_map_.particles_.size();
 
     //fluid devices still contain appropriate data
 
     std::size_t threads = 128;
     std::size_t blocks = (p_count + threads - 1)/threads;
+
+    //update particle data for GPU
+    CUDA_CHECK(cudaMemcpy(
+    this->d_particles_,
+    this->p_map_.particles_.data(),
+    p_count * sizeof(PredictionParticle),
+    cudaMemcpyHostToDevice));
 
     //kernel laucnh
 
@@ -576,7 +882,7 @@ void CUDA_simulation::calc_occ_maps(
             
             //transfer waypoints back to host
             cudaMemcpy(this->occupancy_maps_, 
-            d_occupancy_maps, 
+            d_occupancy_maps.data(), 
             map_bytes, 
             cudaMemcpyDeviceToHost
             );
@@ -626,22 +932,107 @@ void CUDA_simulation::calc_paths(
     std::size_t steps, 
     std::size_t p_count
 ){
+    //reset hit maps to 0
+    std::size_t hit_bytes = this->v_count_ * this->candidate_waypoints_ * p_count * sizeof(unsigned char);
+    cudaMemset(d_hit_map, 0, hit_bytes);
 
-    //create a vector of current goals for all vehicles and pass in, to be used in addition to the canadidate waypoints
+    //waypoint component vectors (-1 because the first is the current, should resize original array to simplify this math)
+    std::vector<float> wp_x(this->candidate_waypoints_-1);
+    std::vector<float> wp_y(this->candidate_waypoints_-1);
 
-    //for every vehicle, for its waypoints, loop through every step, simulating the vehicle advancing towards the waypoint
-    //calculate number of encountered particles on each path making sure not to double count
+    //move candidate waypoints into devices
+    for(int i = 1; i < this->candidate_waypoints_; i++){
+        wp_x[i-1] = this->planner_.wayPoints[i].first;
+        wp_y[i-1] = this->planner_.wayPoints[i].second;
+    }
 
-    //dynamics helper function
-    
-    //pass in vehicle states? waypoints, particle forecasts
+    cudaMemcpy(this->d_waypoints_x, wp_x.data(), wp_x.size()*sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(this->d_waypoints_y, wp_y.data(), wp_y.size()*sizeof(float), cudaMemcpyHostToDevice);
 
-    //return index or sorted collision index of best path
+    std::size_t threads = 256;
+    std::size_t blocks = (p_count + threads - 1) / threads;
 
-    //inpect the CPU side update loop, I'm not sure if this would actually advance correctly
-    //or if it would slow down too much
+
+    //current goals are being passed in as part of vehicle state
+    //alternative waypoints are being passed in in the d_way
+
+
+    path_kernel<<<blocks, threads>>>(
+        this->vs_x, 
+        this->vs_y,
+        this->vs_vx,
+        this->vs_vy,
+        this->vs_heading,
+        this->vs_turnRate,
+        this->vs_goalx,
+        this->vs_goaly,
+        this->d_u_prev_,
+        this->d_v_prev_,
+        this->d_p_horizons,
+        this->d_hit_map,
+        p_count,
+        this->d_waypoints_x,
+        this->d_waypoints_y,
+        this->v_count,
+        this->dt_,
+        this->sensor_radius_,
+        this->candidate_waypoints_,
+        this->env_.m_height,
+        this->env_.m_width,
+        steps
+        );
+
+        //particle hits are in d_hitmap
 
 }
+
+void CUDA_simulation::score_paths(vehicleBatch& vehicles){
+
+    //one block for every vehicle, loops over all waypoint rollouts and calculates hit totals
+    std::size_t p_count = p_map_.particles_.size();
+    //hit total return vectors
+    std::size_t paths = this->v_count_;
+    std::vector<unsigned int> best_wps(paths);
+
+
+
+    int threads = 256;
+    int blocks = this->v_count_;
+
+    //smem is threads / warp size
+    std::size_t warp_count = threads / 32;
+    //should be 8 bytes of shared memory per block to hold temporary hit sums
+    std::size_t smem_bytes = warp_count * sizeof(unsigned int);
+
+    //pass in d_hit_num
+    score_paths_kernel<<<blocks, threads, smem_bytes>>>(
+        this->d_hit_map, 
+        this->candidate_waypoints, 
+        this->v_count, 
+        p_count,
+        this->d_best_wp,
+        warp_count
+
+    );
+
+    cudaMemcpy(best_wps.data(), 
+    d_best_wp, 
+    paths * sizeof(unsigned int), 
+    cudaMemcpyDeviceToHost);
+
+    //loop over results and assign waypoints to the vehicles
+    for(int v = 0; v < this->candidate_waypoints_; v++){
+        const unsigned int winner = best_wps[v];
+
+        if (winner != 0) {
+            VehicleState state = vehicles.load(v);
+            state.goalx = planner_.wayPoints[winner].first;
+            state.goaly = planner_.wayPoints[winner].second;
+            vehicles.set(v, state);
+        }
+    }
+
+};
 
 
 std::size_t CUDA_simulation::runCudaSimulation(
@@ -671,6 +1062,30 @@ std::size_t CUDA_simulation::runCudaSimulation(
 
         particle_scan();
 
+            //scan for goal/target
+            for(int v = 0; v < this->v_count_; v++){
+                vs = vehicles.load(v);
+                
+                //CPU checks if target or goal are inside sensor radius
+                target_found = vehicles.targetCheck(vs, this->target_, env_.m_height);
+                
+                if (target_found) {
+                    vehicles.set(v, vs);
+                    break;
+                }
+        
+                vehicles.goalCheck(vs, this->p_map_);
+
+                vehicles.set(v, vs);
+        
+            }
+
+            if (target_found) {
+                ++curr_step;
+                break;
+            }
+
+
         //once every 50 steps create particle forecast to be used for waypoint calculation
 
         if(curr_step % 50 == 0 && curr_step != 0){
@@ -685,7 +1100,8 @@ std::size_t CUDA_simulation::runCudaSimulation(
 
             calc_occ_maps( 
                 this->planner_.horizon_, 
-                this->p_map_.particles_.size());
+                this->p_map_.particles_.size()
+            );
 
             find_waypoints();
 
@@ -693,60 +1109,12 @@ std::size_t CUDA_simulation::runCudaSimulation(
                 vehicles,
                 this->planner_.horizon_,
                 this->p_map_.particles_.size();
-            )
+            );
+
+            score_paths(vehicles);
 
         }
         
-        //scan for goal/kill particles
-        for(int v = 0; v < this->v_count_; v++){
-            vs = vehicles.load(v);
-            
-            //CPU checks if target or goal are inside sensor radius
-            target_found = vehicles.targetCheck(vs, this->target_, env_.m_height);
-            
-            if (target_found) {
-                vehicles.set(v, vs);
-                break;
-            }
-    
-            vehicles.goalCheck(vs, this->p_map_);
-    
-    
-            //run planner every 50 steps
-            if(curr_step % 50 == 0 && curr_step != 0){
-
-
-
-
-
-                //choose waypoint based on particle drift predictions
-                
-                std::pair<float,float> newWP = this->planner_.chooseWaypoint(
-                    vs, 
-                    this->p_map_.particles_, 
-                    this->env_, 
-                    this->dt_, 
-                    this->temp_map_,
-                    this->dynamics,
-                    this->controller,
-                    this->env_.m_height
-                    );
-
-
-                //update waypoint
-                vs.goalx = newWP.first;
-                vs.goaly = newWP.second;
-
-                
-            }
-            //update old state
-            vehicles.set(v, vs);
-        }
-
-        if (target_found) {
-            ++curr_step;
-            break;
-        }
         
 
 

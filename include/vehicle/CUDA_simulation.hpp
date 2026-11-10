@@ -44,9 +44,11 @@ public:
     void step_vehicles();
 
     void calc_p_horizon(std::size_t steps);
+    void find_waypoints();
     void calc_occ_maps(std::size_t steps, std::size_t p_count);
     void calc_paths(vehicleBatch& vehicles, std::size_t steps, std::size_t p_count);
-    void find_waypoints();
+    void score_paths(vehicleBatch& vehicles);
+    std::pair<float,float> convert_cell(std::size_t cell);
 
     void HtD_fluid();
     void DtH_fluid();
@@ -90,16 +92,19 @@ private:
     float* d_v_prev_ = nullptr;
 
     //waypoint devict
-    std::pair<float,float>* d_waypoints = nullptr;
+    float* d_waypoints_x = nullptr;
+    float* d_waypoints_y = nullptr;
     unsigned int* d_occupancy_maps_ = nullptr;
     std::vector<unsigned int> occupancy_maps_;
     std::size_t candidate_waypoints_ = 3;
+    unsigned int* d_best_wp = nullptr;
 
     //particle device pointer
     PredictionParticle* d_particles_ = nullptr;
     unsigned char* d_remove_particles_ = nullptr;
     PredictionParticle* d_p_horizons = nullptr;
     std::vector<PredictionParticle> horizons_;
+    unsigned char* d_hit_map = nullptr;
 
     std::size_t cell_count_;
     std::size_t v_count_;

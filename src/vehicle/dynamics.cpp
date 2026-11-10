@@ -1,5 +1,6 @@
 #include "vehicle/dynamics.hpp"
 #include <cmath>
+#include "vehicle/constants.hpp"
 
 Dynamics::Dynamics(){
 
@@ -8,10 +9,10 @@ Dynamics::Dynamics(){
 VehicleState Dynamics::step_update(const VehicleState& vs, const Action& action, const environment& env, const float dt, std::size_t steps){
 
     //initial params
-    constexpr float mass = 1.0f;
-    constexpr float momentOfInertia = 1.0f;
-    constexpr float linearDrag = 0.2f;
-    constexpr float turnDrag = 0.35f;
+    constexpr float mass = constants::mass;
+    constexpr float momentOfInertia = constants::momentOfInertia;
+    constexpr float linearDrag = constants::linearDrag;
+    constexpr float turnDrag = constants::turnDrag;
     constexpr float pi = 3.14159265359f;
 
     //retrieve wind disturbance at this position

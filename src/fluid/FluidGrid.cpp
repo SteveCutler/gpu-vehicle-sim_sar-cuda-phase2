@@ -18,7 +18,7 @@ m_diff_co(4.5f),
 m_viscosity(0.05f),
 m_decay(0.994f),
 m_curl_mult(1000),
-m_noise_freq(0.04f),
+m_noise_freq(0.01f),
 m_mult_threaded(threaded),
 m_noiseTimeMult(10.f),
 
