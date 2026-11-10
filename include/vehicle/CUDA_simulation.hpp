@@ -20,14 +20,16 @@ public:
         ProbabilityMap& temp_map,
         environment& env,
         std::size_t N,
-        float dt):
+        float dt,
+        std::size_t cell_size):
         planner_(planner),
         target_(target),
         p_map_(p_map),
         temp_map_(temp_map),
         env_(env),
         v_count_(N),
-        dt_(dt)
+        dt_(dt),
+        cell_size_(cell_size)
         {};
     
     CUDA_simulation(const CUDA_simulation&) = delete;
@@ -40,12 +42,16 @@ public:
     void HtD_vehicles(const vehicleBatch& vehicles);
     void DtH_vehicles(vehicleBatch& vehicles);
     void step_vehicles();
-    void calc_p_horizon();
-    
+
+    void calc_p_horizon(std::size_t steps);
+    void calc_occ_maps(std::size_t steps, std::size_t p_count);
+    void calc_paths(vehicleBatch& vehicles, std::size_t steps, std::size_t p_count);
+    void find_waypoints();
+
     void HtD_fluid();
     void DtH_fluid();
 
-    void particle_scan(std::size_t steps);
+    void particle_scan();
 
     
 
@@ -83,13 +89,21 @@ private:
     float* d_u_prev_ = nullptr;
     float* d_v_prev_ = nullptr;
 
+    //waypoint devict
+    std::pair<float,float>* d_waypoints = nullptr;
+    unsigned int* d_occupancy_maps_ = nullptr;
+    std::vector<unsigned int> occupancy_maps_;
+    std::size_t candidate_waypoints_ = 3;
+
     //particle device pointer
     PredictionParticle* d_particles_ = nullptr;
     unsigned char* d_remove_particles_ = nullptr;
     PredictionParticle* d_p_horizons = nullptr;
+    std::vector<PredictionParticle> horizons_;
 
-    std::size_t cell_count_ = 0;
+    std::size_t cell_count_;
     std::size_t v_count_;
     float dt_;
+    std::size_t cell_size_;
 
 };

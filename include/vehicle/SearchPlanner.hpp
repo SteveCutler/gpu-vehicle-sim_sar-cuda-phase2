@@ -12,11 +12,10 @@ private:
 
     std::size_t horizon_;
     std::vector<std::vector<PredictionParticle>> forecast_;
-    std::vector<std::pair<float,float>> wayPoints;
     std::vector<std::size_t> wpCount_;
     std::size_t w_index_;
-
-public:
+    
+    public:
     SearchPlanner(std::size_t horizon);
     
     std::pair<float,float> chooseWaypoint(VehicleState vs, 
@@ -27,5 +26,7 @@ public:
         Dynamics& dynamics,
         Controller& controller,
         std::size_t height_);
-    ~SearchPlanner() = default;
+        ~SearchPlanner() = default;
+        
+        std::vector<std::pair<float,float>> wayPoints;
 };

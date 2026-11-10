@@ -148,7 +148,7 @@ int main(int argNum, char* argVals[]){
     #endif
 
     #ifdef ENABLE_CUDA
-        CUDA_simulation CudaSim(planner, target, p_map, tempMap, env, N, dt);
+        CUDA_simulation CudaSim(planner, target, p_map, tempMap, env, N, dt, cell_size);
         CudaSim.init_simulation(
             vehicles
         );

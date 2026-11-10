@@ -5,12 +5,8 @@
 #include "vehicle/controller_CUDA.hpp"
 #include "vehicle/dynamics_CUDA.hpp"
 #include "vehicle/vehicleTypes.hpp"
-
+#include <vector>
 #include "vehicle/SearchPlanner.hpp"
-
-
-
-
 
 #include <iostream>
 
@@ -229,6 +225,66 @@ __global__ void p_horizons(
     }
 
 }
+
+__global__ void occupancy_kernel(
+    unsigned int* maps, 
+    PredictionParticle* forecasts, 
+    std::size_t steps, 
+    std::size_t p_count, 
+    std::size_t cell_size,
+    std::size_t cell_count,
+    std::size_t height,
+    std::size_t width){
+
+    //one thread for every particle
+    std::size_t idx = threadIdx.x + blockDim.x * blockIdx.x;
+
+    if(idx >= p_count){
+        return;
+    }
+
+    //calculate starting indices
+    int s1 = p_count * (steps/2);
+    int s2 = p_count * (steps);
+
+    //grab correct particles
+    PredictionParticle p1 = forecasts[s1 + idx];
+    PredictionParticle p2 = forecasts[s2 + idx];
+
+    if (!(p1.pos.x >= 0.f && p1.pos.x < width &&
+        p1.pos.y >= 0.f && p1.pos.y < height)) {
+        continue;
+    }
+
+    //calculate number of rows and cols
+    std::size_t rows = height / cell_size;
+    std::size_t cols = width / cell_size;
+
+    //calc pmap grid cells
+    std::size_t cell_col_p1 = floorf(p1.pos.x / cell_size);
+    std::size_t cell_row_p1 = floorf(p1.pos.y / cell_size);
+
+    std::size_t cell_col_p2 = floorf(p2.pos.x / cell_size);
+    std::size_t cell_row_p2 = floorf(p2.pos.y / cell_size);
+
+    std::size_t cell_index_1 = cell_row_p1* cols + cell_col_p1;
+    std::size_t cell_index_2 = (cell_row_p2* cols + cell_col_p2) + cell_count;
+
+
+    //add particle to cell map
+    atomicAdd(&maps[cell_index_1], 1u);
+    atomicAdd(&maps[cell_index_2], 1u);
+
+};
+
+
+__global__ void path_kernel(
+
+){
+
+}
+
+
 void CUDA_simulation::init_simulation( 
     vehicleBatch& vehicles){
         
@@ -244,7 +300,10 @@ void CUDA_simulation::init_simulation(
        //particles are AoS layout
        const std::size_t pBytes = this->p_map_.particles_.size() * sizeof(PredictionParticle);
        const std::size_t flagBytes = this->p_map_.particles_.size() * sizeof(unsigned char);
-       const std::size_t p_horizons_Bytes = this->p_map_.particles_.size() * (this->planner_.horizon_ + 1) * sizeof(PredictionParticle);
+
+        std::size_t steps = this->planner_.horizon_ + 1;
+        std::size_t p_count = this->p_map_.particles_.size();
+        std::size_t p_horizons_Bytes = p_count * steps * sizeof(PredictionParticle);
 
        
        //allocate devices for vehicle batch data, allocate here and copy over in HtDvehicles function
@@ -269,6 +328,19 @@ void CUDA_simulation::init_simulation(
         cudaMalloc(&this->d_particles_, pBytes);
         cudaMalloc(&this->d_remove_particles_, flagBytes);
         cudaMalloc(&this->d_p_horizons, p_horizons_Bytes);
+        
+        //allocate space for particle horizons
+        this->horizons_.resize(p_count * steps );
+        //allocate space for candidate waypoints
+        this->planner_.wayPoints.resize(this->candidate_waypoints_);
+        cudaMalloc(&this->d_waypoints, this->candidate_waypoints_*sizeof(std::pair<float,float>));
+
+        //occupancy maps -> -1 because the first waypoint candidate is the current one
+        cudaMalloc(&this->d_occupancy_maps_, (cell_count_ * (this->candidate_waypoints_ - 1) * sizeof(unsigned int)))
+        this->occupancy_maps_.resize(cell_count_ * (this->candidate_waypoints_ - 1));
+
+        //calc number of cells
+        this->cell_count_ = (env_.m_width / cell_size_) * (env_.m_height / cell_size_);
 
 
 }
@@ -445,10 +517,6 @@ void CUDA_simulation::calc_p_horizon(std::size_t steps){
     std::size_t steps = this->planner_.horizon_ + 1;
     std::size_t p_count = p_map_.particles_.size();
 
-    //create vector to hold returned horizons
-    std::vector<PredictionParticle> p_horizons;
-    p_horizons.resize(p_count * steps );
-
     //fluid devices still contain appropriate data
 
     std::size_t threads = 128;
@@ -467,34 +535,118 @@ void CUDA_simulation::calc_p_horizon(std::size_t steps){
         this->env_.m_width,
         this->dt_);
 
-        //copy data back over
+        //copy data back over, save to member variable
 
-        cudaMemcpy(p_horizons.data(), 
-        this->d_p_horizons, 
-        p_count * steps * sizeof(PredictionParticle), 
-        cudaMemcpyDeviceToHost);
+        // cudaMemcpy(this->horizons_.data(), 
+        // this->d_p_horizons, 
+        // p_count * steps * sizeof(PredictionParticle), 
+        // cudaMemcpyDeviceToHost);
 
 
     
 
 }
 
+void CUDA_simulation::calc_occ_maps(
+    std::size_t steps, 
+    std::size_t p_count){
+
+        //create two empty occupancy grids to pass in
+
+        std::size_t map_bytes = 
+            this->cell_count_ * (this->candidate_waypoints_ - 1) * sizeof(unsigned int);
+        cudaMemset(this->d_occupancy_maps, 0, map_bytes);
+
+
+        int threads = 256;
+        int blocks = (p_count + threads - 1)/threads;
+        
+        if(p_count > 0){
+
+            // launch kernel -> compute occupancy at key horizons to determine candidate waypoints
+           occupancy_kernel<<<blocks, threads>>>(
+                this->d_occupancy_maps, 
+                this->d_p_horizons, 
+                steps-1, 
+                p_count, 
+                this->cell_size_, 
+                this->cell_count_,
+                this->env_.m_height,
+                this->env_.m_width);
+            
+            //transfer waypoints back to host
+            cudaMemcpy(this->occupancy_maps_, 
+            d_occupancy_maps, 
+            map_bytes, 
+            cudaMemcpyDeviceToHost
+            );
+
+        }
+
+    }
+
+std::pair<float,float> CUDA_simulation::convert_cell(std::size_t cell){
+    
+    std::size_t cols = this->env_.m_width / this->cell_size_;
+
+    std::size_t col = cell % cols;
+    std::size_t row = cell / cols;
+
+    // Centre of the selected cell.
+    float goalx = (static_cast<float>(col) + 0.5f) * this->cell_size_;
+    float goaly = this->env_.m_height - (static_cast<float>(row) + 0.5f) * this->cell_size_;
+    return {goalx, goaly};
+};
+
+
+void CUDA_simulation::find_waypoints(){
+
+    for(int wp = 0; wp <= 1; wp++){
+
+        unsigned int max = 0;
+        std::size_t max_cell = 0;
+
+        //loop through section of occupancy map
+        for(int cell = 0 + (wp*this->cell_count_); cell < ((wp+1) * this->cell_count_); cell++){
+            if(this->occupancy_maps_[cell] > max){
+                max_cell = cell - (wp*this->cell_count_);
+                max = this->occupancy_maps_[cell];
+            }
+
+        }
+
+        this->planner_.wayPoints[wp+1] = convert_cell(max_cell);
+
+    }
+
+}
+
+void CUDA_simulation::calc_paths(
+    vehicleBatch& vehicles, 
+    std::size_t steps, 
+    std::size_t p_count
+){
+
+    //create a vector of current goals for all vehicles and pass in, to be used in addition to the canadidate waypoints
+
+    //for every vehicle, for its waypoints, loop through every step, simulating the vehicle advancing towards the waypoint
+    //calculate number of encountered particles on each path making sure not to double count
+
+    //dynamics helper function
+    
+    //pass in vehicle states? waypoints, particle forecasts
+
+    //return index or sorted collision index of best path
+
+    //inpect the CPU side update loop, I'm not sure if this would actually advance correctly
+    //or if it would slow down too much
+
+}
+
+
 std::size_t CUDA_simulation::runCudaSimulation(
     vehicleBatch& vehicles,
     std::size_t steps){
-
-
-    //UPDATE FLOW
-    //decide on action
-    //calculate newState
-    //check if target found -> if so break
-    //if step%50 == 0 update waypoints -> include in state
-    //update to new state
-
-    //drift update
-    //update particle map
-    //compute probability
-    //update fluid
 
     VehicleState vs;
     VehicleState newState;
@@ -518,6 +670,32 @@ std::size_t CUDA_simulation::runCudaSimulation(
         DtH_vehicles(vehicles);
 
         particle_scan();
+
+        //once every 50 steps create particle forecast to be used for waypoint calculation
+
+        if(curr_step % 50 == 0 && curr_step != 0){
+
+            //Waypoint Recalculation -> break into 4 seperate operations 
+
+            //particle horizon forecast
+            calc_p_horizon(this->planner_.horizon_);
+
+            //build midpoint/endpoint occupancy maps and return candidate paths
+
+
+            calc_occ_maps( 
+                this->planner_.horizon_, 
+                this->p_map_.particles_.size());
+
+            find_waypoints();
+
+            calc_paths(
+                vehicles,
+                this->planner_.horizon_,
+                this->p_map_.particles_.size();
+            )
+
+        }
         
         //scan for goal/kill particles
         for(int v = 0; v < this->v_count_; v++){
@@ -538,17 +716,7 @@ std::size_t CUDA_simulation::runCudaSimulation(
             if(curr_step % 50 == 0 && curr_step != 0){
 
 
-                //break operation into 4 seperate kernels ->
 
-                //particle horizon forecast
-                calc_p_horizon(this->planner_.horizon_);
-
-                //build midpoint/endpoint occupancy maps and return candidate paths
-                calc_candidate_waypoints(this->planner_.horizon_);
-
-                //vehicle rollouts to predict highest return path
-
-                //
 
 
                 //choose waypoint based on particle drift predictions
@@ -617,10 +785,14 @@ CUDA_simulation::~CUDA_simulation(){
         d_u_prev_,
         d_v_prev_,
     };
-    
+    //free float array pointers
     for (float* ptr : allocations){
         cudaFree(ptr);
     }
+    //free other allocations
     cudaFree(d_particles_);
     cudaFree(d_remove_particles_);    
+    cudaFree(d_p_horizons_);    
+
+    
 }
