@@ -8,6 +8,7 @@
 
 class SearchPlanner
 {
+    friend class CUDA_simulation;
 private:
 
     std::size_t horizon_;

@@ -88,8 +88,8 @@ std::pair<float,float> SearchPlanner::chooseWaypoint(VehicleState vs,
                     float x_pos = forecast_[step][p].pos.x;
                     float y_pos = forecast_[step][p].pos.y;
 
-                    float x_dist = abs(x_pos - simVehicle.x);
-                    float y_dist = abs(y_pos - (height_ - simVehicle.y));
+                    float x_dist = (x_pos - simVehicle.x);
+                    float y_dist = (y_pos - (height_ - simVehicle.y));
 
                     if(x_dist*x_dist + y_dist*y_dist < (simVehicle.sensor_rad*2)*(2* simVehicle.sensor_rad)){
                         seen.insert(p);

@@ -10,6 +10,17 @@
 #include "vehicle/constants.hpp"
 
 #include <iostream>
+#include <stdexcept>
+#include <algorithm>
+#include <string>
+
+inline void cudaCheck(cudaError_t result, const char* expression, int line){
+    if(result != cudaSuccess){
+        throw std::runtime_error(std::string(__FILE__) + ":" + std::to_string(line)
+            + " " + expression + ": " + cudaGetErrorString(result));
+    }
+}
+#define CUDA_CHECK(expression) cudaCheck((expression), #expression, __LINE__)
 
 //velocity field sample device helper function
 __device__ cuda::std::pair<float,float> vel_sample(    
@@ -207,7 +218,7 @@ __global__ void p_horizons(
 
     //advance particle through all steps and write to return array
 
-    for(int s = 1; s < steps; s++){
+    for(std::size_t s = 1; s <= steps; s++){
         
         
         //use vel sample device function to sample curent at pos
@@ -215,8 +226,8 @@ __global__ void p_horizons(
                                                 d_v_prev, 
                                                 width, 
                                                 height, 
-                                                particles.pos.x, 
-                                                particles.pos.y);
+                                                particle.pos.x,
+                                                particle.pos.y);
 
                                                 //advect particles using current sample
         particle.pos.x += current.first * dt;
@@ -245,36 +256,33 @@ __global__ void occupancy_kernel(
     }
 
     //calculate starting indices
-    int s1 = p_count * (steps/2);
-    int s2 = p_count * (steps);
+    std::size_t s1 = p_count * (steps/2);
+    std::size_t s2 = p_count * (steps);
 
     //grab correct particles
     PredictionParticle p1 = forecasts[s1 + idx];
     PredictionParticle p2 = forecasts[s2 + idx];
 
-    if (!(p1.pos.x >= 0.f && p1.pos.x < width &&
-        p1.pos.y >= 0.f && p1.pos.y < height)) {
-        continue;
-    }
-
-    //calculate number of rows and cols
+    // Each forecast sample can independently leave or re-enter the domain.
     std::size_t rows = height / cell_size;
     std::size_t cols = width / cell_size;
 
-    //calc pmap grid cells
-    std::size_t cell_col_p1 = floorf(p1.pos.x / cell_size);
-    std::size_t cell_row_p1 = floorf(p1.pos.y / cell_size);
-
-    std::size_t cell_col_p2 = floorf(p2.pos.x / cell_size);
-    std::size_t cell_row_p2 = floorf(p2.pos.y / cell_size);
-
-    std::size_t cell_index_1 = cell_row_p1* cols + cell_col_p1;
-    std::size_t cell_index_2 = (cell_row_p2* cols + cell_col_p2) + cell_count;
-
-
-    //add particle to cell map
-    atomicAdd(&maps[cell_index_1], 1u);
-    atomicAdd(&maps[cell_index_2], 1u);
+    if(p1.pos.x >= 0.f && p1.pos.x < width &&
+       p1.pos.y >= 0.f && p1.pos.y < height){
+        std::size_t col = static_cast<std::size_t>(floorf(p1.pos.x / cell_size));
+        std::size_t row = static_cast<std::size_t>(floorf(p1.pos.y / cell_size));
+        if(col < cols && row < rows){
+            atomicAdd(&maps[row * cols + col], 1u);
+        }
+    }
+    if(p2.pos.x >= 0.f && p2.pos.x < width &&
+       p2.pos.y >= 0.f && p2.pos.y < height){
+        std::size_t col = static_cast<std::size_t>(floorf(p2.pos.x / cell_size));
+        std::size_t row = static_cast<std::size_t>(floorf(p2.pos.y / cell_size));
+        if(col < cols && row < rows){
+            atomicAdd(&maps[cell_count + row * cols + col], 1u);
+        }
+    }
 
 };
 
@@ -423,7 +431,6 @@ __global__ void path_kernel(
         return;
     }
     VehicleState vs;
-    PredictionParticle particle;
 
     //for every vehicle, 
     for(int v = 0; v < v_count; v++){
@@ -448,14 +455,14 @@ __global__ void path_kernel(
             }
 
             //calculate current offset for hitmap
-            unsigned int offset = (wp * p_count) + (v * wp_num * p_count);
+            std::size_t offset = (wp * p_count) + (v * wp_num * p_count);
 
             //current step set to 0
             hit_map[offset + idx] = 0;
 
             //for each step calculate new vehicle pos given this waypoint
             //loop starts at 1 to exclude current step
-            for(int s = 1; s < steps; s++){
+            for(std::size_t s = 1; s <= steps; s++){
                 //pass vehicle state by reference, this updates to new state
                 dynamics_update(vs,
                     controller_update(vs),
@@ -467,7 +474,7 @@ __global__ void path_kernel(
 
                 //for each particle check to see if it is in the sensor radius of the new vehicle state
             
-                particle = p_forecasts[p_count * s + idx];
+                const PredictionParticle particle = p_forecasts[p_count * s + idx];
                 if(scan_helper(
                     particle.pos.x,
                     static_cast<float>(height) - particle.pos.y,
@@ -604,44 +611,44 @@ void CUDA_simulation::init_simulation(
 
        
        //allocate devices for vehicle batch data, allocate here and copy over in HtDvehicles function
-        cudaMalloc(&this->vs_x, floatBytes);
-        cudaMalloc(&this->vs_y, floatBytes);
-        cudaMalloc(&this->vs_vx, floatBytes);
-        cudaMalloc(&this->vs_vy, floatBytes);
-        cudaMalloc(&this->vs_heading, floatBytes);
-        cudaMalloc(&this->vs_turnRate, floatBytes);
-        cudaMalloc(&this->vs_goalx, floatBytes);
-        cudaMalloc(&this->vs_goaly, floatBytes);
+        CUDA_CHECK(cudaMalloc(&this->vs_x, floatBytes));
+        CUDA_CHECK(cudaMalloc(&this->vs_y, floatBytes));
+        CUDA_CHECK(cudaMalloc(&this->vs_vx, floatBytes));
+        CUDA_CHECK(cudaMalloc(&this->vs_vy, floatBytes));
+        CUDA_CHECK(cudaMalloc(&this->vs_heading, floatBytes));
+        CUDA_CHECK(cudaMalloc(&this->vs_turnRate, floatBytes));
+        CUDA_CHECK(cudaMalloc(&this->vs_goalx, floatBytes));
+        CUDA_CHECK(cudaMalloc(&this->vs_goaly, floatBytes));
         
         
         //allocate memory to devices for fluid fields
-        cudaMalloc(&this->d_u_, fluidBytes);
-        cudaMalloc(&this->d_v_, fluidBytes);
-        cudaMalloc(&this->d_u_prev_, fluidBytes);
-        cudaMalloc(&this->d_v_prev_, fluidBytes);
+        CUDA_CHECK(cudaMalloc(&this->d_u_, fluidBytes));
+        CUDA_CHECK(cudaMalloc(&this->d_v_, fluidBytes));
+        CUDA_CHECK(cudaMalloc(&this->d_u_prev_, fluidBytes));
+        CUDA_CHECK(cudaMalloc(&this->d_v_prev_, fluidBytes));
 
 
         //allocate memory to particle device
-        cudaMalloc(&this->d_particles_, pBytes);
-        cudaMalloc(&this->d_remove_particles_, flagBytes);
-        cudaMalloc(&this->d_p_horizons, p_horizons_Bytes);
+        CUDA_CHECK(cudaMalloc(&this->d_particles_, pBytes));
+        CUDA_CHECK(cudaMalloc(&this->d_remove_particles_, flagBytes));
+        CUDA_CHECK(cudaMalloc(&this->d_p_horizons, p_horizons_Bytes));
         
         //allocate space for particle horizons
         this->horizons_.resize(p_count * steps );
         //allocate space for candidate waypoint calculations
         this->planner_.wayPoints.resize(this->candidate_waypoints_);
-        cudaMalloc(&this->d_waypoints_x, (this->candidate_waypoints_-1)*sizeof(float));
-        cudaMalloc(&this->d_waypoints_y, (this->candidate_waypoints_-1)*sizeof(float));
-        cudaMalloc(&this->d_best_wp, (this->v_count_ * sizeof(unsigned int)));
+        CUDA_CHECK(cudaMalloc(&this->d_waypoints_x, (this->candidate_waypoints_-1)*sizeof(float)));
+        CUDA_CHECK(cudaMalloc(&this->d_waypoints_y, (this->candidate_waypoints_-1)*sizeof(float)));
+        CUDA_CHECK(cudaMalloc(&this->d_best_wp, (this->v_count_ * sizeof(unsigned int))));
 
         //occupancy maps -> -1 because the first waypoint candidate is the current one
         this->cell_count_ = (env_.m_width / cell_size_) * (env_.m_height / cell_size_);
-        cudaMalloc(&this->d_occupancy_maps_, (cell_count_ * (this->candidate_waypoints_ - 1) * sizeof(unsigned int)));
+        CUDA_CHECK(cudaMalloc(&this->d_occupancy_maps_, (cell_count_ * (this->candidate_waypoints_ - 1) * sizeof(unsigned int))));
         this->occupancy_maps_.resize(cell_count_ * (this->candidate_waypoints_ - 1));
 
         //calc number of cells
         //allocate space for hit maps for path calculations
-        cudaMalloc(&this->d_hit_map, hit_bytes);
+        CUDA_CHECK(cudaMalloc(&this->d_hit_map, hit_bytes));
 
 
 }
@@ -651,14 +658,14 @@ void CUDA_simulation::HtD_vehicles(const vehicleBatch& vehicles){
         const std::size_t floatBytes = this->v_count_ * sizeof(float);
      
         //copy data from host to device
-        cudaMemcpy(this->vs_x, vehicles.m_x.data(), floatBytes, cudaMemcpyHostToDevice);
-        cudaMemcpy(this->vs_y, vehicles.m_y.data(), floatBytes, cudaMemcpyHostToDevice);
-        cudaMemcpy(this->vs_vx, vehicles.m_vx.data(), floatBytes, cudaMemcpyHostToDevice);
-        cudaMemcpy(this->vs_vy, vehicles.m_vy.data(), floatBytes, cudaMemcpyHostToDevice);
-        cudaMemcpy(this->vs_heading, vehicles.m_heading.data(), floatBytes, cudaMemcpyHostToDevice);
-        cudaMemcpy(this->vs_turnRate, vehicles.m_turnRate.data(), floatBytes, cudaMemcpyHostToDevice);
-        cudaMemcpy(this->vs_goalx, vehicles.m_goalx.data(), floatBytes, cudaMemcpyHostToDevice);
-        cudaMemcpy(this->vs_goaly, vehicles.m_goaly.data(), floatBytes, cudaMemcpyHostToDevice);
+        CUDA_CHECK(cudaMemcpy(this->vs_x, vehicles.m_x.data(), floatBytes, cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(this->vs_y, vehicles.m_y.data(), floatBytes, cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(this->vs_vx, vehicles.m_vx.data(), floatBytes, cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(this->vs_vy, vehicles.m_vy.data(), floatBytes, cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(this->vs_heading, vehicles.m_heading.data(), floatBytes, cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(this->vs_turnRate, vehicles.m_turnRate.data(), floatBytes, cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(this->vs_goalx, vehicles.m_goalx.data(), floatBytes, cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(this->vs_goaly, vehicles.m_goaly.data(), floatBytes, cudaMemcpyHostToDevice));
 
         //check for allocation errors
         cudaError_t error = cudaGetLastError();
@@ -673,14 +680,14 @@ void CUDA_simulation::DtH_vehicles(vehicleBatch& vehicles){
     const std::size_t floatBytes = v_count_ * sizeof(float);
 
     //copy vehicle data from device to host
-    cudaMemcpy(vehicles.m_x.data(), vs_x, floatBytes, cudaMemcpyDeviceToHost);
-    cudaMemcpy(vehicles.m_y.data(), vs_y, floatBytes, cudaMemcpyDeviceToHost);
-    cudaMemcpy(vehicles.m_vx.data(), vs_vx, floatBytes, cudaMemcpyDeviceToHost);
-    cudaMemcpy(vehicles.m_vy.data(), vs_vy, floatBytes, cudaMemcpyDeviceToHost);
-    cudaMemcpy(vehicles.m_heading.data(), vs_heading, floatBytes, cudaMemcpyDeviceToHost);
-    cudaMemcpy(vehicles.m_turnRate.data(), vs_turnRate, floatBytes, cudaMemcpyDeviceToHost);
-    cudaMemcpy(vehicles.m_goalx.data(), vs_goalx, floatBytes, cudaMemcpyDeviceToHost);
-    cudaMemcpy(vehicles.m_goaly.data(), vs_goaly, floatBytes, cudaMemcpyDeviceToHost);
+    CUDA_CHECK(cudaMemcpy(vehicles.m_x.data(), vs_x, floatBytes, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(vehicles.m_y.data(), vs_y, floatBytes, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(vehicles.m_vx.data(), vs_vx, floatBytes, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(vehicles.m_vy.data(), vs_vy, floatBytes, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(vehicles.m_heading.data(), vs_heading, floatBytes, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(vehicles.m_turnRate.data(), vs_turnRate, floatBytes, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(vehicles.m_goalx.data(), vs_goalx, floatBytes, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(vehicles.m_goaly.data(), vs_goaly, floatBytes, cudaMemcpyDeviceToHost));
 
         //check for allocation errors
     cudaError_t error = cudaGetLastError();
@@ -703,7 +710,7 @@ void CUDA_simulation::particle_scan(){
     std::vector<unsigned char> remove_particles(p_count);
 
     //transfer particle data to GPU
-    cudaMemcpy(this->d_particles_, particles.data(), p_count*sizeof(PredictionParticle), cudaMemcpyHostToDevice);
+    CUDA_CHECK(cudaMemcpy(this->d_particles_, particles.data(), p_count*sizeof(PredictionParticle), cudaMemcpyHostToDevice));
 
     int threads = 256;
     int blocks = (p_count + threads - 1) / threads;
@@ -719,9 +726,10 @@ void CUDA_simulation::particle_scan(){
         p_count,
         static_cast<float>(env_.m_height)
         );
+    CUDA_CHECK(cudaGetLastError());
     
     //transfer back hits and remove them from p_map.particles_
-    cudaMemcpy(remove_particles.data(), d_remove_particles_, sizeof(unsigned char) * p_count, cudaMemcpyDeviceToHost);
+    CUDA_CHECK(cudaMemcpy(remove_particles.data(), d_remove_particles_, sizeof(unsigned char) * p_count, cudaMemcpyDeviceToHost));
 
     //remove collision particles
     int write = 0;
@@ -745,10 +753,10 @@ void CUDA_simulation::HtD_fluid(){
         const std::size_t fluidBytes = this->env_.m_width * this->env_.m_height * sizeof(float);
      
         //copy data from host to device
-        cudaMemcpy(this->d_u_, this->env_.fluid_grid.m_u_velocity.data(), fluidBytes, cudaMemcpyHostToDevice);
-        cudaMemcpy(this->d_v_, this->env_.fluid_grid.m_v_velocity.data(), fluidBytes, cudaMemcpyHostToDevice);
-        cudaMemcpy(this->d_u_prev_, this->env_.fluid_grid.m_u_velocity_prev.data(), fluidBytes, cudaMemcpyHostToDevice);
-        cudaMemcpy(this->d_v_prev_, this->env_.fluid_grid.m_v_velocity_prev.data(), fluidBytes, cudaMemcpyHostToDevice);
+        CUDA_CHECK(cudaMemcpy(this->d_u_, this->env_.fluid_grid.m_u_velocity.data(), fluidBytes, cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(this->d_v_, this->env_.fluid_grid.m_v_velocity.data(), fluidBytes, cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(this->d_u_prev_, this->env_.fluid_grid.m_u_velocity_prev.data(), fluidBytes, cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(this->d_v_prev_, this->env_.fluid_grid.m_v_velocity_prev.data(), fluidBytes, cudaMemcpyHostToDevice));
 
         //check for allocation errors
         cudaError_t error = cudaGetLastError();
@@ -763,10 +771,10 @@ void CUDA_simulation::DtH_fluid(){
 
     //copy vehicle data from device to host
     const std::size_t fluidBytes = this->env_.m_width * this->env_.m_height * sizeof(float);
-    cudaMemcpy(this->env_.fluid_grid.m_u_velocity.data(), this->d_u_, fluidBytes, cudaMemcpyDeviceToHost);
-    cudaMemcpy(this->env_.fluid_grid.m_v_velocity.data(), this->d_v_, fluidBytes, cudaMemcpyDeviceToHost);
-    cudaMemcpy(this->env_.fluid_grid.m_u_velocity_prev.data(), this->d_u_prev_, fluidBytes, cudaMemcpyDeviceToHost);
-    cudaMemcpy(this->env_.fluid_grid.m_v_velocity_prev.data(),this->d_v_prev_, fluidBytes, cudaMemcpyDeviceToHost);
+    CUDA_CHECK(cudaMemcpy(this->env_.fluid_grid.m_u_velocity.data(), this->d_u_, fluidBytes, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(this->env_.fluid_grid.m_v_velocity.data(), this->d_v_, fluidBytes, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(this->env_.fluid_grid.m_u_velocity_prev.data(), this->d_u_prev_, fluidBytes, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(this->env_.fluid_grid.m_v_velocity_prev.data(),this->d_v_prev_, fluidBytes, cudaMemcpyDeviceToHost));
 
         //check for allocation errors
     cudaError_t error = cudaGetLastError();
@@ -779,6 +787,7 @@ void CUDA_simulation::DtH_fluid(){
 
 
 void CUDA_simulation::step_vehicles(){
+        if(v_count_ == 0) return;
         //threading setup
         std::size_t threads = 256;
         std::size_t blocks = (this->v_count_ + threads-1)/threads;
@@ -815,6 +824,7 @@ void CUDA_simulation::calc_p_horizon(std::size_t steps){
     
     //need horizon device holder
     std::size_t p_count = p_map_.particles_.size();
+    if(p_count == 0) return;
 
     //fluid devices still contain appropriate data
 
@@ -840,6 +850,7 @@ void CUDA_simulation::calc_p_horizon(std::size_t steps){
         this->env_.m_height,
         this->env_.m_width,
         this->dt_);
+    CUDA_CHECK(cudaGetLastError());
 
         //copy data back over, save to member variable
 
@@ -858,10 +869,11 @@ void CUDA_simulation::calc_occ_maps(
     std::size_t p_count){
 
         //create two empty occupancy grids to pass in
+        std::fill(occupancy_maps_.begin(), occupancy_maps_.end(), 0u);
 
         std::size_t map_bytes = 
             this->cell_count_ * (this->candidate_waypoints_ - 1) * sizeof(unsigned int);
-        cudaMemset(this->d_occupancy_maps, 0, map_bytes);
+        CUDA_CHECK(cudaMemset(this->d_occupancy_maps_, 0, map_bytes));
 
 
         int threads = 256;
@@ -871,21 +883,22 @@ void CUDA_simulation::calc_occ_maps(
 
             // launch kernel -> compute occupancy at key horizons to determine candidate waypoints
            occupancy_kernel<<<blocks, threads>>>(
-                this->d_occupancy_maps, 
+                this->d_occupancy_maps_,
                 this->d_p_horizons, 
-                steps-1, 
+                steps,
                 p_count, 
                 this->cell_size_, 
                 this->cell_count_,
                 this->env_.m_height,
                 this->env_.m_width);
+    CUDA_CHECK(cudaGetLastError());
             
             //transfer waypoints back to host
-            cudaMemcpy(this->occupancy_maps_, 
-            d_occupancy_maps.data(), 
+            CUDA_CHECK(cudaMemcpy(this->occupancy_maps_.data(),
+            this->d_occupancy_maps_,
             map_bytes, 
             cudaMemcpyDeviceToHost
-            );
+            ));
 
         }
 
@@ -932,9 +945,14 @@ void CUDA_simulation::calc_paths(
     std::size_t steps, 
     std::size_t p_count
 ){
+    if(p_count == 0 || v_count_ == 0) return;
+
+    // CPU goal checks may have changed candidate zero after the last download.
+    HtD_vehicles(vehicles);
+
     //reset hit maps to 0
     std::size_t hit_bytes = this->v_count_ * this->candidate_waypoints_ * p_count * sizeof(unsigned char);
-    cudaMemset(d_hit_map, 0, hit_bytes);
+    CUDA_CHECK(cudaMemset(d_hit_map, 0, hit_bytes));
 
     //waypoint component vectors (-1 because the first is the current, should resize original array to simplify this math)
     std::vector<float> wp_x(this->candidate_waypoints_-1);
@@ -946,8 +964,8 @@ void CUDA_simulation::calc_paths(
         wp_y[i-1] = this->planner_.wayPoints[i].second;
     }
 
-    cudaMemcpy(this->d_waypoints_x, wp_x.data(), wp_x.size()*sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(this->d_waypoints_y, wp_y.data(), wp_y.size()*sizeof(float), cudaMemcpyHostToDevice);
+    CUDA_CHECK(cudaMemcpy(this->d_waypoints_x, wp_x.data(), wp_x.size()*sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(this->d_waypoints_y, wp_y.data(), wp_y.size()*sizeof(float), cudaMemcpyHostToDevice));
 
     std::size_t threads = 256;
     std::size_t blocks = (p_count + threads - 1) / threads;
@@ -973,7 +991,7 @@ void CUDA_simulation::calc_paths(
         p_count,
         this->d_waypoints_x,
         this->d_waypoints_y,
-        this->v_count,
+        this->v_count_,
         this->dt_,
         this->sensor_radius_,
         this->candidate_waypoints_,
@@ -981,12 +999,14 @@ void CUDA_simulation::calc_paths(
         this->env_.m_width,
         steps
         );
+    CUDA_CHECK(cudaGetLastError());
 
         //particle hits are in d_hitmap
 
 }
 
 void CUDA_simulation::score_paths(vehicleBatch& vehicles){
+    if(v_count_ == 0 || p_map_.particles_.empty()) return;
 
     //one block for every vehicle, loops over all waypoint rollouts and calculates hit totals
     std::size_t p_count = p_map_.particles_.size();
@@ -1001,27 +1021,28 @@ void CUDA_simulation::score_paths(vehicleBatch& vehicles){
 
     //smem is threads / warp size
     std::size_t warp_count = threads / 32;
-    //should be 8 bytes of shared memory per block to hold temporary hit sums
+    //8 unsigned-int warp totals: 32 bytes per block
     std::size_t smem_bytes = warp_count * sizeof(unsigned int);
 
     //pass in d_hit_num
     score_paths_kernel<<<blocks, threads, smem_bytes>>>(
         this->d_hit_map, 
-        this->candidate_waypoints, 
-        this->v_count, 
+        this->candidate_waypoints_,
+        this->v_count_,
         p_count,
         this->d_best_wp,
         warp_count
 
     );
+    CUDA_CHECK(cudaGetLastError());
 
-    cudaMemcpy(best_wps.data(), 
+    CUDA_CHECK(cudaMemcpy(best_wps.data(),
     d_best_wp, 
     paths * sizeof(unsigned int), 
-    cudaMemcpyDeviceToHost);
+    cudaMemcpyDeviceToHost));
 
     //loop over results and assign waypoints to the vehicles
-    for(int v = 0; v < this->candidate_waypoints_; v++){
+    for(std::size_t v = 0; v < this->v_count_; v++){
         const unsigned int winner = best_wps[v];
 
         if (winner != 0) {
@@ -1088,7 +1109,7 @@ std::size_t CUDA_simulation::runCudaSimulation(
 
         //once every 50 steps create particle forecast to be used for waypoint calculation
 
-        if(curr_step % 50 == 0 && curr_step != 0){
+        if(curr_step % 50 == 0 && curr_step != 0 && !p_map_.particles_.empty()){
 
             //Waypoint Recalculation -> break into 4 seperate operations 
 
@@ -1108,7 +1129,7 @@ std::size_t CUDA_simulation::runCudaSimulation(
             calc_paths(
                 vehicles,
                 this->planner_.horizon_,
-                this->p_map_.particles_.size();
+                this->p_map_.particles_.size()
             );
 
             score_paths(vehicles);
@@ -1160,7 +1181,12 @@ CUDA_simulation::~CUDA_simulation(){
     //free other allocations
     cudaFree(d_particles_);
     cudaFree(d_remove_particles_);    
-    cudaFree(d_p_horizons_);    
+    cudaFree(d_p_horizons);
+    cudaFree(d_hit_map);
+    cudaFree(d_occupancy_maps_);
+    cudaFree(d_waypoints_x);
+    cudaFree(d_waypoints_y);
+    cudaFree(d_best_wp);
 
     
 }

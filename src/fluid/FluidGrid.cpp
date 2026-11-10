@@ -1085,9 +1085,9 @@ std::pair<float,float> FluidGrid::vel_sample(float x, float y) const{
         float v_vel = 0.f;
 
         std::size_t x_floor = std::floor(x);
-        std::size_t x_high = x_floor+1;
+        std::size_t x_high = (x_floor < m_width - 1) ? x_floor + 1 : x_floor;
         std::size_t y_floor = std::floor(y);
-        std::size_t y_high = y_floor+1;
+        std::size_t y_high = (y_floor < m_height - 1) ? y_floor + 1 : y_floor;
 
         std::size_t i = y_floor*m_width + x_floor;
 

@@ -128,6 +128,8 @@ void ProbabilityMap::computeProb(){
             std::size_t cell_row = std::floor(particles_[i].pos.y / cell_size_);
             std::size_t cell_col = std::floor(particles_[i].pos.x / cell_size_);
 
+            if(cell_row >= rows || cell_col >= cols) continue;
+
             std::size_t cell_index = cell_row * cols + cell_col;
 
             //add new cell to occupied cells list
@@ -137,12 +139,12 @@ void ProbabilityMap::computeProb(){
 
             //add particle to cell map
             map_[cell_index] += 1.0f; 
-                //change target cell if new update pushes cell to high probability than old target cell
-                if(map_[cell_index] > map_[target_cell]){
-                    target_cell = cell_index;
-                }
-                //std::cout << "target cell is: " << target_cell << std::endl;
+
 
         }
     }
+    // Select from completed counts; ties use the lowest cell index on both backends.
+    target_cell = map_.empty() ? 0 :
+        static_cast<std::size_t>(std::max_element(map_.begin(), map_.end()) - map_.begin());
+
 };

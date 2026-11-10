@@ -1,3 +1,4 @@
+#include "vehicle/constants.hpp"
 //#include "vehicle/dynamics.hpp"
 #include "vehicle/dynamics_CUDA.hpp"
 #include <cmath>
@@ -11,10 +12,10 @@ __device__ DynamicsCuda::DynamicsCuda(){
 __device__ VehicleState DynamicsCuda::step_update(const VehicleState& vs, const Action& action, cuda::std::pair<float,float> current, const float dt){
 
     //initial params
-    constexpr float mass = 1.0f;
-    constexpr float momentOfInertia = 1.0f;
-    constexpr float linearDrag = 0.2f;
-    constexpr float turnDrag = 0.35f;
+    constexpr float mass = constants::mass;
+    constexpr float momentOfInertia = constants::momentOfInertia;
+    constexpr float linearDrag = constants::linearDrag;
+    constexpr float turnDrag = constants::turnDrag;
     constexpr float pi = 3.14159265359f;
 
     //retrieve wind disturbance at this position

@@ -149,9 +149,9 @@ int main(int argNum, char* argVals[]){
 
     #ifdef ENABLE_CUDA
         CUDA_simulation CudaSim(planner, target, p_map, tempMap, env, N, dt, cell_size);
-        CudaSim.init_simulation(
-            vehicles
-        );
+        if(useCuda){
+            CudaSim.init_simulation(vehicles);
+        }
     #endif
 
 
@@ -193,13 +193,6 @@ int main(int argNum, char* argVals[]){
                     }
                     vehicles.goalCheck(newState, p_map);
 
-                    if(curr_step % 50 == 0 && curr_step != 0){
-                        const auto newWP = planner.chooseWaypoint(
-                            newState, p_map.particles_, env, dt, tempMap,
-                            dynamics, controller, height);
-                        newState.goalx = newWP.first;
-                        newState.goaly = newWP.second;
-                    }
                     vehicles.set(x, newState);
                 }
 
@@ -207,6 +200,18 @@ int main(int argNum, char* argVals[]){
                 if(target_found){
                     ++curr_step;
                     break;
+                }
+
+                if(curr_step % 50 == 0 && curr_step != 0 && !p_map.particles_.empty()){
+                    for(std::size_t x = 0; x < N; ++x){
+                        newState = vehicles.load(x);
+                        const auto newWP = planner.chooseWaypoint(
+                            newState, p_map.particles_, env, dt, tempMap,
+                            dynamics, controller, height);
+                        newState.goalx = newWP.first;
+                        newState.goaly = newWP.second;
+                        vehicles.set(x, newState);
+                    }
                 }
 
                 driftDynamics.DriftUpdate(
