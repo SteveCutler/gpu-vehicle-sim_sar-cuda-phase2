@@ -57,6 +57,7 @@ public:
     void step_fluid(float dt);
     void HtD_fluid();
     void DtH_fluid();
+    void DtH_fluid_export();
 
 
     void advect_vel(float dt);
