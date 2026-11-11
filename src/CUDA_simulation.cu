@@ -649,7 +649,9 @@ __global__ void particle_update_kernel(
     const float* d_u_prev_, 
     const float* d_v_prev_,
     const std::size_t p_count, 
-    const float dt
+    const float dt,
+    const std::size_t width,
+    const std::size_t height
 ){
 
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -769,7 +771,7 @@ void CUDA_simulation::init_simulation(
 
         //allocate memory to particle device
         CUDA_CHECK(cudaMalloc(&this->d_particles_, pBytes));
-        CUDA_CHECK(cudaMalloc(&this->d_particle_buffer, pBytes));
+        CUDA_CHECK(cudaMalloc(&this->d_particle_buffer_, pBytes));
         CUDA_CHECK(cudaMalloc(&this->d_remove_particles_, flagBytes));
         CUDA_CHECK(cudaMalloc(&this->d_p_horizons, p_horizons_Bytes));
         CUDA_CHECK(cudaMalloc(&this->d_remainder, (sizeof(unsigned int))));
@@ -1200,52 +1202,52 @@ void CUDA_simulation::score_paths(vehicleBatch& vehicles){
 };
 
 void CUDA_simulation::update_particles(){
-
-    //re upload particles?
-    //use hit map for dead map?
-
     std::size_t p_count = this->p_map_.particles_.size();
+    if(p_count == 0) return;
 
     //reset values to 0
-    cudaMemset(d_remove_particles_, 0, p_count * sizeof(unsigned char));
-    CUDA_CHECK(cudaMemcpy(d_particles_, 
-        this->p_map_.particles_, 
+    CUDA_CHECK(cudaMemcpy(d_particles_,
+        this->p_map_.particles_.data(),
         p_count * sizeof(PredictionParticle),
         cudaMemcpyHostToDevice));
 
-    threads = 256;
-    blocks = (p_count + threads - 1)/threads;
+    std::size_t threads = 256;
+    std::size_t blocks = (p_count + threads - 1)/threads;
 
     //updates particle positions and marks particles for dead if their life hits 0
     particle_update_kernel<<<blocks,threads>>>(
-        this->d_particles, 
-        this->d_remove_particles, 
+        this->d_particles_,
+        this->d_remove_particles_,
         this->d_u_prev_, 
         this->d_v_prev_, 
         p_count,
-        this->dt_);
+        this->dt_,
+        this->env_.m_width,
+        this->env_.m_height);
+    CUDA_CHECK(cudaGetLastError());
 
         
         
         //variable to receive remaining particle count
         unsigned int remainder;
-        cudaMemset(d_remainder, 0, sizeof(unsigned int));
+        CUDA_CHECK(cudaMemset(d_remainder, 0, sizeof(unsigned int)));
         
     //seperate kernel that removes particles marked as dead
     //baseline impl uses atomic adds
     particle_cull_atomic<<<blocks, threads>>>(
-        this->d_particles,
-        this->d_particle_buffer,
+        this->d_particles_,
+        this->d_particle_buffer_,
         this->d_remainder,
         this->d_remove_particles_,
         p_count
         );
+    CUDA_CHECK(cudaGetLastError());
     
         //copy back remaining number of particles
-    CUDA_CHECK(cudaMemcpy(&remainder, this->d_remainder, sizeof(unsigned int), cudaMemcpyDeviceToHost ))
+    CUDA_CHECK(cudaMemcpy(&remainder, this->d_remainder, sizeof(unsigned int), cudaMemcpyDeviceToHost ));
     //copy remaining particles into buffer
     this->p_map_.particles_.resize(remainder);
-    CUDA_CHECK(cudaMemcpy(this->p_map_.particles_.data(), this->d_particle_buffer, remainder * sizeof(PredictionParticle), cudaMemcpyDeviceToHost))
+    CUDA_CHECK(cudaMemcpy(this->p_map_.particles_.data(), this->d_particle_buffer_, remainder * sizeof(PredictionParticle), cudaMemcpyDeviceToHost));
     
     //swap the buffer contents
     std::swap(d_particles_, d_particle_buffer_);
@@ -1260,22 +1262,30 @@ void CUDA_simulation::compute_prob_cuda(){
     std::size_t p_count = p_map_.particles_.size();
     CUDA_CHECK(cudaMemset(d_occupancy_map, 0u, this->cell_count_*sizeof(unsigned int)));
 
-    std::size_t threads = 256
+    std::size_t threads = 256;
     std::size_t blocks = (p_count + threads - 1) / threads;
 
+    if(p_count > 0){
     occupancy_kernel<<<blocks, threads>>>(
-        this->d_particles,
+        this->d_particles_,
         this->d_occupancy_map,
         p_count,
         this->env_.m_height,
         this->env_.m_width,
         this->cell_size_
     );
+    CUDA_CHECK(cudaGetLastError());
+    }
 
-    cudaMemcpy(this->p_map_.map_.data(), 
+    CUDA_CHECK(cudaMemcpy(this->p_map_.map_.data(),
     d_occupancy_map, 
     this->cell_count_*sizeof(unsigned int),
-    cudaMemcpyDeviceToHost )
+    cudaMemcpyDeviceToHost ));
+
+    p_map_.occupied_cells.clear();
+    for(std::size_t cell = 0; cell < cell_count_; cell++){
+        if(p_map_.map_[cell] != 0u) p_map_.occupied_cells.push_back(cell);
+    }
     
     p_map_.target_cell = static_cast<std::size_t>(
         std::max_element(p_map_.map_.begin(), p_map_.map_.end()) - p_map_.map_.begin());
