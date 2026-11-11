@@ -80,7 +80,7 @@ int main(int argNum, char* argVals[]){
     // }
 
     //Vehicles
-    std::size_t N = 2;
+    std::size_t N = 5;
     //Steps
     std::size_t steps = -1;
 
@@ -100,7 +100,7 @@ int main(int argNum, char* argVals[]){
     //target initialization
     DriftItem target;
     target.x = static_cast<float>(width/2.0f);
-    target.y = static_cast<float>(height*0.8f);
+    target.y = static_cast<float>(height*0.7f);
 
     //initialize vehicleState data
     vehicleBatch vehicles(N, env, target.x, height - target.y);
@@ -115,7 +115,7 @@ int main(int argNum, char* argVals[]){
 
     //init Probability Map
     float prob_rad = 25.f;
-    std::size_t particle_count = 10000;
+    std::size_t particle_count = 1000;
     std::size_t cell_size = 50;
 
     //convert target spawn location to cell to initialize vehicles to target last known location of object
@@ -132,7 +132,7 @@ int main(int argNum, char* argVals[]){
     Action action;
     VehicleState newState;
     //init planner, horizon of 50 steps
-    SearchPlanner planner(50, N);
+    SearchPlanner planner(250, N);
 
    
 
