@@ -55,6 +55,7 @@ public:
     void step_fluid(float dt);
     void HtD_fluid();
     void DtH_fluid();
+    void DtH_fluid_export();
 
     void calc_noise(float dt);
     void calc_vel(float dt);

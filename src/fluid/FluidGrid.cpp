@@ -100,6 +100,14 @@ const std::vector<float>& FluidGrid::get_noise() const{
     return m_noise;
 };
 
+const std::vector<float>& FluidGrid::pressure() const{
+    return m_pressure;
+}
+
+const std::vector<float>& FluidGrid::divergence() const{
+    return m_divergence;
+}
+
 const std::vector<std::uint8_t> & FluidGrid::get_pixels() const{
     return m_pixels;
 };

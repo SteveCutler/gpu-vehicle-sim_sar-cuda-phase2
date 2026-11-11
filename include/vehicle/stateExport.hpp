@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <string>
 #include "vehicle/DriftItem.hpp"
+#include "fluid/FluidGrid.hpp"
 #include <vector>
 
 inline void exportStates(
@@ -70,5 +71,44 @@ inline void exportParticles(
 
     if (!out) {
         throw std::runtime_error("Failed to write particles: " + path);
+    }
+}
+
+inline void exportFluid(
+    const FluidGrid& fluid,
+    std::size_t width,
+    std::size_t height,
+    const std::string& path)
+{
+    std::ofstream out(path);
+    if (!out) {
+        throw std::runtime_error("Cannot open output file: " + path);
+    }
+
+    const auto& u = fluid.u_velocity();
+    const auto& v = fluid.v_velocity();
+    const auto& r = fluid.density_r();
+    const auto& g = fluid.density_g();
+    const auto& b = fluid.density_b();
+    const auto& pressure = fluid.pressure();
+    const auto& divergence = fluid.divergence();
+    const auto& noise = fluid.get_noise();
+
+    out << std::setprecision(std::numeric_limits<float>::max_digits10);
+    out << "x,y,u,v,density_r,density_g,density_b,pressure,divergence,noise\n";
+
+    for (std::size_t y = 0; y < height; ++y) {
+        for (std::size_t x = 0; x < width; ++x) {
+            std::size_t i = y * width + x;
+            out << x << ',' << y << ','
+                << u[i] << ',' << v[i] << ','
+                << r[i] << ',' << g[i] << ',' << b[i] << ','
+                << pressure[i] << ',' << divergence[i] << ',' << noise[i] << '\n';
+        }
+    }
+
+    out.close();
+    if (!out) {
+        throw std::runtime_error("Failed to write fluid: " + path);
     }
 }

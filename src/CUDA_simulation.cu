@@ -795,6 +795,17 @@ void CUDA_simulation::DtH_fluid(){
     CUDA_CHECK(cudaMemcpy(env_.fluid_grid.m_v_velocity_prev.data(), d_v_prev_, fluidBytes, cudaMemcpyDeviceToHost));
 }
 
+void CUDA_simulation::DtH_fluid_export(){
+    // Velocity is already downloaded each step for CPU target and particle drift.
+    // Download the remaining fields only when writing the final comparison CSV.
+    const std::size_t fluidBytes = env_.m_width * env_.m_height * sizeof(float);
+    CUDA_CHECK(cudaMemcpy(env_.fluid_grid.m_density_r.data(), d_density_r_, fluidBytes, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(env_.fluid_grid.m_density_g.data(), d_density_g_, fluidBytes, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(env_.fluid_grid.m_density_b.data(), d_density_b_, fluidBytes, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(env_.fluid_grid.m_pressure.data(), d_pressure_, fluidBytes, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(env_.fluid_grid.m_divergence.data(), d_divergence_, fluidBytes, cudaMemcpyDeviceToHost));
+}
+
 void CUDA_simulation::step_vehicles(){
         if(v_count_ == 0) return;
         //threading setup

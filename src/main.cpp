@@ -246,11 +246,20 @@ int main(int argNum, char* argVals[]){
 
             //output file name for correctness comparison
             if (argNum > 3) {
+                #ifdef ENABLE_CUDA
+                if(useCuda){
+                    CudaSim.DtH_fluid_export();
+                }
+                #endif
+
                 exportStates(vehicles, argVals[3]);
 
                 exportParticles(
                     p_map.particles_,
                     std::string(argVals[3]) + ".particles.csv");
+
+                exportFluid(env.fluid_grid, width, height,
+                    std::string(argVals[3]) + ".fluid.csv");
             }
             
 

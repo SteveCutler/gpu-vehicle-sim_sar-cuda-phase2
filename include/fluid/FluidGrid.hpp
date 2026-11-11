@@ -96,6 +96,8 @@ class FluidGrid
         const std::vector<float>& u_velocity() const;
         const std::vector<float>& v_velocity() const;
         const std::vector<float>& get_noise() const;
+        const std::vector<float>& pressure() const;
+        const std::vector<float>& divergence() const;
 
         const std::vector<std::uint8_t> & get_pixels() const;
 
