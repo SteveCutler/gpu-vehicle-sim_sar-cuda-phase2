@@ -29,14 +29,14 @@ struct PredictionParticle{
         life_ = 1.f;
     }
 
-    PredictionParticle(float x_pos, float y_pos, std::size_t id){
+    PredictionParticle(std::size_t id, float x_pos, float y_pos){
         ID = id;
         pos.x = x_pos;
         pos.y = y_pos;
         weight = 0.f;
     }
 
-    PredictionParticle(float x_pos, float y_pos, float life, std::size_t id){
+    PredictionParticle(std::size_t id, float x_pos, float y_pos, float life){
         ID = id;
         pos.x = x_pos;
         pos.y = y_pos;
