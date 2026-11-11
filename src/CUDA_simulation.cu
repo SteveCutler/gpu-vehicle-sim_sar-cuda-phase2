@@ -586,6 +586,54 @@ __global__ void score_paths_kernel(
 
 }
 
+
+__global__ void particle_update_kernel(
+    PredictionParticle* particles,
+    unsigned char* dead_map,
+    const float* d_u_prev_, 
+    const float* d_v_prev_,
+    const std::size_t p_count, 
+    const float dt
+){
+
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    
+    if(idx >= p_count){
+        return;
+    }
+    
+    dead_map[idx] = 0;
+
+    PredictionParticle& p = particles[idx];
+
+    p.life -= dt;
+    cuda::std::pair<float, float> current;
+
+    //branch divergence
+    if(p.life <= 0){
+        //if particle is dead, mark for removal
+        dead_map[idx] = 1;
+        return;
+    }else{
+        // else update position based on fluid sample
+        current = vel_sample(d_u_prev_, 
+                            d_v_prev_, 
+                            width, 
+                            height, 
+                            p.pos.x, 
+                            p.pos.y);
+        p.pos.x += current.first * dt;
+        p.pos.y += current.second * dt;
+    }
+
+}
+
+__global__ void particle_cull_atomic(
+
+){
+
+}
+
 void CUDA_simulation::init_simulation( 
     vehicleBatch& vehicles){
         
@@ -1075,6 +1123,35 @@ void CUDA_simulation::score_paths(vehicleBatch& vehicles){
 
 };
 
+void CUDA_simulation::update_particles(){
+
+    //re upload particles?
+    //use hit map for dead map?
+
+    std::size_t p_count = this->env_.particles_.size();
+
+    threads = 256;
+    blocks = (p_count + threads - 1)/threads;
+
+    particle_update_kernel<<<blocks,threads>>>(
+        this->d_particles, 
+        this->d_dead_map, 
+        this->d_u_prev_, 
+        this->d_v_prev_, 
+        p_count,
+        this->dt_);
+
+    //seperate kernel that removes particles marked as dead
+
+    particle_cull_atomic<<<blocks, threads>>>(this->d_dead_map,);
+
+    //duplicate particle buffer that they write into and then swap
+    //baseline impl uses atomic adds
+    //advanced implementation uses prefix sume and shuffle operations to just move the data down
+    //and then CPU resizes the vector after to remove dead particle data
+
+    //resize d_dead_map and d_particles after?
+};
 
 std::size_t CUDA_simulation::runCudaSimulation(
     vehicleBatch& vehicles,
@@ -1157,11 +1234,12 @@ std::size_t CUDA_simulation::runCudaSimulation(
         
         
 
-        // STILL NEED TO BE PORTED TO CUDA
-
+        //update drifting item - currently relies on the CPU fluidsim, 
+        //probably keep calculations on CPU but sample the correct field from the GPU data
         //update target location
         this->p_map_.DD_.DriftUpdate(this->target_, env_.getDisturbance(this->target_.x, this->target_.y, 0.0f), this->dt_);
     
+        update_particles();
         //update probability particles
         this->p_map_.update(this->env_, this->dt_);
     

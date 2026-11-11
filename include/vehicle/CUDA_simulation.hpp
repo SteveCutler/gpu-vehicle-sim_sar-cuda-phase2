@@ -51,29 +51,18 @@ public:
     void calc_paths(vehicleBatch& vehicles, std::size_t steps, std::size_t p_count);
     void score_paths(vehicleBatch& vehicles);
     std::pair<float,float> convert_cell(std::size_t cell);
+    void update_particles();
 
     void step_fluid(float dt);
     void HtD_fluid();
     void DtH_fluid();
-    void DtH_fluid_export();
 
-    void calc_noise(float dt);
-    void calc_vel(float dt);
+
     void advect_vel(float dt);
     void diffuse_vel(float dt);
-    void swap_vel();
-    void swap_density();
-    void vel_boundaries();
-    void pressure_boundaries();
-    void scalar_boundaries(float* field);
     void project_step();
-    void add_source(std::size_t x, std::size_t y, float size, Vec3 clr);
-    void diffuse(float dt, const float* source, float*& destination);
-    void advect_decay(float dt, const float* source, float* dest);
-
-
+  
     
-
     //init objects
     Controller controller;
     Dynamics dynamics;

@@ -96,7 +96,7 @@ void ProbabilityMap::add_Particles(){
 
     std::uniform_real_distribution<float> randomX(min_x + margin, max_x - margin);
     std::uniform_real_distribution<float> randomY(min_y + margin, max_y - margin);
-    std::uniform_real_distribution<float> randomLife(50.f, 100.f);
+    std::uniform_real_distribution<float> randomLife(1.f, 10.f);
 
     float x;
     float y;
