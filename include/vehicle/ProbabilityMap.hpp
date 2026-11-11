@@ -23,6 +23,7 @@ public:
     std::size_t height_;
     std::size_t target_cell;
     std::vector<PredictionParticle> particles_;
+    std::vector<PredictionParticle> particle_buffer;
     std::size_t cell_size_;
     std::vector<float> map_;
     std::size_t num_p_;

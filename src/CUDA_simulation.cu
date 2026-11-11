@@ -606,11 +606,11 @@ __global__ void particle_update_kernel(
 
     PredictionParticle& p = particles[idx];
 
-    p.life -= dt;
+    p.life_ -= dt;
     cuda::std::pair<float, float> current;
 
     //branch divergence
-    if(p.life <= 0){
+    if(p.life_ < 0){
         //if particle is dead, mark for removal
         dead_map[idx] = 1;
         return;
@@ -629,8 +629,23 @@ __global__ void particle_update_kernel(
 }
 
 __global__ void particle_cull_atomic(
-
+    PredictionParticle* particles,
+    PredictionParticle* particle_buffer,
+    unsigned int* remainder,
+    unsigned char* remove_map,
+    std::size_t p_count
 ){
+
+    int idx = threadIdx.x + blockDim.x * blockIdx.x;
+
+    if(idx >= p_count){
+        return;
+    }
+
+    if(remove_map[idx] == 0){
+        unsigned int slot = atomicAdd(remainder, 1u);
+        particle_buffer[slot] = particles[idx];
+    }
 
 }
 
@@ -698,8 +713,10 @@ void CUDA_simulation::init_simulation(
 
         //allocate memory to particle device
         CUDA_CHECK(cudaMalloc(&this->d_particles_, pBytes));
+        CUDA_CHECK(cudaMalloc(&this->d_particle_buffer, pBytes));
         CUDA_CHECK(cudaMalloc(&this->d_remove_particles_, flagBytes));
         CUDA_CHECK(cudaMalloc(&this->d_p_horizons, p_horizons_Bytes));
+        CUDA_CHECK(cudaMalloc(&this->d_remainder, (sizeof(unsigned int))));
         
         //allocate space for particle horizons
         this->horizons_.resize(p_count * steps );
@@ -800,6 +817,7 @@ void CUDA_simulation::particle_scan(){
     CUDA_CHECK(cudaMemcpy(remove_particles.data(), d_remove_particles_, sizeof(unsigned char) * p_count, cudaMemcpyDeviceToHost));
 
     //remove collision particles
+    //THIS CAN BE PORTED TO GPU
     int write = 0;
     for(int read = 0; read < particles.size(); read++){
         if(remove_particles[read] == 0){
@@ -1128,29 +1146,78 @@ void CUDA_simulation::update_particles(){
     //re upload particles?
     //use hit map for dead map?
 
-    std::size_t p_count = this->env_.particles_.size();
+    std::size_t p_count = this->p_map_.particles_.size();
+
+    //reset values to 0
+    cudaMemset(d_remove_particles_, 0, p_count * sizeof(unsigned char));
+    CUDA_CHECK(cudaMemcpy(d_particles_, 
+        this->p_map_.particles_, 
+        p_count * sizeof(PredictionParticle),
+        cudaMemcpyHostToDevice));
 
     threads = 256;
     blocks = (p_count + threads - 1)/threads;
 
+    //updates particle positions and marks particles for dead if their life hits 0
     particle_update_kernel<<<blocks,threads>>>(
         this->d_particles, 
-        this->d_dead_map, 
+        this->d_remove_particles, 
         this->d_u_prev_, 
         this->d_v_prev_, 
         p_count,
         this->dt_);
 
+        
+        
+        //variable to receive remaining particle count
+        unsigned int remainder;
+        cudaMemset(d_remainder, 0, sizeof(unsigned int));
+        
     //seperate kernel that removes particles marked as dead
-
-    particle_cull_atomic<<<blocks, threads>>>(this->d_dead_map,);
-
-    //duplicate particle buffer that they write into and then swap
     //baseline impl uses atomic adds
-    //advanced implementation uses prefix sume and shuffle operations to just move the data down
-    //and then CPU resizes the vector after to remove dead particle data
+    particle_cull_atomic<<<blocks, threads>>>(
+        this->d_particles,
+        this->d_particle_buffer,
+        this->d_remainder,
+        this->d_remove_particles_,
+        p_count
+        );
+    
+        //copy back remaining number of particles
+    CUDA_CHECK(cudaMemcpy(&remainder, this->d_remainder, sizeof(unsigned int), cudaMemcpyDeviceToHost ))
+    //copy remaining particles into buffer
+    this->p_map_.particles_.resize(remainder);
+    CUDA_CHECK(cudaMemcpy(this->p_map_.particles_.data(), this->d_particle_buffer, remainder * sizeof(PredictionParticle), cudaMemcpyDeviceToHost))
+    
+    //swap the buffer contents
+    std::swap(d_particles_, d_particle_buffer_);
 
-    //resize d_dead_map and d_particles after?
+    //advanced implementation will use prefix sums and shuffle the data around on GPU, CPU resize the resulting vector to keep only remaining particles
+
+};
+
+void CUDA_simulation::compute_prob_cuda(){
+    // if(particles_[i].pos.x >= 0 && particles_[i].pos.x < width_ &&
+    //     particles_[i].pos.y >= 0 && particles_[i].pos.y < height_){
+
+    //         //calc pmap grid cell
+    //         std::size_t cell_row = std::floor(particles_[i].pos.y / cell_size_);
+    //         std::size_t cell_col = std::floor(particles_[i].pos.x / cell_size_);
+
+    //         if(cell_row >= rows || cell_col >= cols) continue;
+
+    //         std::size_t cell_index = cell_row * cols + cell_col;
+
+    //         //add new cell to occupied cells list
+    //         if(map_[cell_index] == 0.f){
+    //             occupied_cells.push_back(cell_index);
+    //         }
+
+    //         //add particle to cell map
+    //         map_[cell_index] += 1.0f; 
+
+
+    //     }
 };
 
 std::size_t CUDA_simulation::runCudaSimulation(
@@ -1239,12 +1306,13 @@ std::size_t CUDA_simulation::runCudaSimulation(
         //update target location
         this->p_map_.DD_.DriftUpdate(this->target_, env_.getDisturbance(this->target_.x, this->target_.y, 0.0f), this->dt_);
     
-        update_particles();
         //update probability particles
-        this->p_map_.update(this->env_, this->dt_);
+        update_particles();
+        //this->p_map_.update(this->env_, this->dt_);
     
         //compute probability
-        this->p_map_.computeProb();
+        compute_prob_cuda();
+        //this->p_map_.computeProb();
     
 
         //CUDA fluid update
@@ -1291,6 +1359,8 @@ CUDA_simulation::~CUDA_simulation(){
     }
     //free other allocations
     cudaFree(d_particles_);
+    cudaFree(d_particle_buffer_);
+    cudaFree(d_remainder);
     cudaFree(d_remove_particles_);    
     cudaFree(d_p_horizons);
     cudaFree(d_hit_map);

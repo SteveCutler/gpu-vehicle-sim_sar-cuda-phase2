@@ -52,6 +52,7 @@ public:
     void score_paths(vehicleBatch& vehicles);
     std::pair<float,float> convert_cell(std::size_t cell);
     void update_particles();
+    void compute_prob_cuda();
 
     void step_fluid(float dt);
     void HtD_fluid();
@@ -62,7 +63,7 @@ public:
     void diffuse_vel(float dt);
     void project_step();
   
-    
+
     //init objects
     Controller controller;
     Dynamics dynamics;
@@ -125,6 +126,8 @@ private:
 
     //PARTICLE POINTER VARS
     PredictionParticle* d_particles_ = nullptr;
+    PredictionParticle* d_particle_buffer_ = nullptr;
+    unsigned int* d_remainder = nullptr;
     unsigned char* d_remove_particles_ = nullptr;
     PredictionParticle* d_p_horizons = nullptr;
     std::vector<PredictionParticle> horizons_;
