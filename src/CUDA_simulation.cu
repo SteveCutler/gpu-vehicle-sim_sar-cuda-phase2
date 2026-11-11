@@ -238,15 +238,35 @@ __global__ void p_horizons(
 
 }
 
-__global__ void occupancy_kernel(
+__device__ void particle_bin_helper_atomic(
+    const PredictionParticle& p,
+    unsigned int* maps,
+    const std::size_t rows,
+    const std::size_t cols,
+    const std::size_t cell_size,
+    const std::size_t width,
+    const std::size_t height,
+    const std::size_t offset
+){
+    if(p.pos.x >= 0.f && p.pos.x < width &&
+       p.pos.y >= 0.f && p.pos.y < height){
+        std::size_t col = static_cast<std::size_t>(floorf(p.pos.x / cell_size));
+        std::size_t row = static_cast<std::size_t>(floorf(p.pos.y / cell_size));
+        if(col < cols && row < rows){
+            atomicAdd(&maps[row * cols + col + offset], 1u);
+        }
+    }
+}
+
+__global__ void path_occupancy_kernel(
     unsigned int* maps, 
-    PredictionParticle* forecasts, 
-    std::size_t steps, 
-    std::size_t p_count, 
-    std::size_t cell_size,
-    std::size_t cell_count,
-    std::size_t height,
-    std::size_t width){
+    const PredictionParticle* forecasts, 
+    const std::size_t steps, 
+    const std::size_t p_count, 
+    const std::size_t cell_size,
+    const std::size_t cell_count,
+    const std::size_t height,
+    const std::size_t width){
 
     //one thread for every particle
     std::size_t idx = threadIdx.x + blockDim.x * blockIdx.x;
@@ -267,24 +287,60 @@ __global__ void occupancy_kernel(
     std::size_t rows = height / cell_size;
     std::size_t cols = width / cell_size;
 
-    if(p1.pos.x >= 0.f && p1.pos.x < width &&
-       p1.pos.y >= 0.f && p1.pos.y < height){
-        std::size_t col = static_cast<std::size_t>(floorf(p1.pos.x / cell_size));
-        std::size_t row = static_cast<std::size_t>(floorf(p1.pos.y / cell_size));
-        if(col < cols && row < rows){
-            atomicAdd(&maps[row * cols + col], 1u);
-        }
-    }
-    if(p2.pos.x >= 0.f && p2.pos.x < width &&
-       p2.pos.y >= 0.f && p2.pos.y < height){
-        std::size_t col = static_cast<std::size_t>(floorf(p2.pos.x / cell_size));
-        std::size_t row = static_cast<std::size_t>(floorf(p2.pos.y / cell_size));
-        if(col < cols && row < rows){
-            atomicAdd(&maps[cell_count + row * cols + col], 1u);
-        }
-    }
+    particle_bin_helper_atomic(
+        p1,
+        maps,
+        rows,
+        cols,
+        cell_size,
+        width,
+        height,
+        0
+    );
+    particle_bin_helper_atomic(
+        p2,
+        maps,
+        rows,
+        cols,
+        cell_size,
+        width,
+        height,
+        cell_count
+    );
 
 };
+
+
+__global__ void occupancy_kernel(
+    const PredictionParticle* particles,
+    unsigned int* prob_map,
+    const std::size_t p_count,
+    const std::size_t height,
+    const std::size_t width,
+    const std::size_t cell_size
+){
+
+    std::size_t idx = threadIdx.x + blockDim.x * blockIdx.x;
+    
+    if(idx >= p_count){
+        return;
+    }
+
+    PredictionParticle p = particles[idx];
+    std::size_t rows = height / cell_size;
+    std::size_t cols = width / cell_size;
+
+    particle_bin_helper_atomic(
+    p,
+    prob_map,
+    rows,
+    cols,
+    cell_size,
+    width,
+    height,
+    0);
+
+}
 
 __device__ Action controller_update(
     const VehicleState& vs
@@ -728,6 +784,7 @@ void CUDA_simulation::init_simulation(
 
         //occupancy maps -> -1 because the first waypoint candidate is the current one
         this->cell_count_ = (env_.m_width / cell_size_) * (env_.m_height / cell_size_);
+        CUDA_CHECK(cudaMalloc(&this->d_occupancy_map, (cell_count_ * sizeof(unsigned int))));
         CUDA_CHECK(cudaMalloc(&this->d_occupancy_maps_, (cell_count_ * (this->candidate_waypoints_ - 1) * sizeof(unsigned int))));
         this->occupancy_maps_.resize(cell_count_ * (this->candidate_waypoints_ - 1));
 
@@ -959,6 +1016,7 @@ void CUDA_simulation::calc_occ_maps(
 
         std::size_t map_bytes = 
             this->cell_count_ * (this->candidate_waypoints_ - 1) * sizeof(unsigned int);
+
         CUDA_CHECK(cudaMemset(this->d_occupancy_maps_, 0, map_bytes));
 
 
@@ -968,7 +1026,7 @@ void CUDA_simulation::calc_occ_maps(
         if(p_count > 0){
 
             // launch kernel -> compute occupancy at key horizons to determine candidate waypoints
-           occupancy_kernel<<<blocks, threads>>>(
+           path_occupancy_kernel<<<blocks, threads>>>(
                 this->d_occupancy_maps_,
                 this->d_p_horizons, 
                 steps,
@@ -1197,27 +1255,30 @@ void CUDA_simulation::update_particles(){
 };
 
 void CUDA_simulation::compute_prob_cuda(){
-    // if(particles_[i].pos.x >= 0 && particles_[i].pos.x < width_ &&
-    //     particles_[i].pos.y >= 0 && particles_[i].pos.y < height_){
 
-    //         //calc pmap grid cell
-    //         std::size_t cell_row = std::floor(particles_[i].pos.y / cell_size_);
-    //         std::size_t cell_col = std::floor(particles_[i].pos.x / cell_size_);
+    //reset occupancy map values
+    std::size_t p_count = p_map_.particles_.size();
+    CUDA_CHECK(cudaMemset(d_occupancy_map, 0u, this->cell_count_*sizeof(unsigned int)));
 
-    //         if(cell_row >= rows || cell_col >= cols) continue;
+    std::size_t threads = 256
+    std::size_t blocks = (p_count + threads - 1) / threads;
 
-    //         std::size_t cell_index = cell_row * cols + cell_col;
+    occupancy_kernel<<<blocks, threads>>>(
+        this->d_particles,
+        this->d_occupancy_map,
+        p_count,
+        this->env_.m_height,
+        this->env_.m_width,
+        this->cell_size_
+    );
 
-    //         //add new cell to occupied cells list
-    //         if(map_[cell_index] == 0.f){
-    //             occupied_cells.push_back(cell_index);
-    //         }
-
-    //         //add particle to cell map
-    //         map_[cell_index] += 1.0f; 
-
-
-    //     }
+    cudaMemcpy(this->p_map_.map_.data(), 
+    d_occupancy_map, 
+    this->cell_count_*sizeof(unsigned int),
+    cudaMemcpyDeviceToHost )
+    
+    p_map_.target_cell = static_cast<std::size_t>(
+        std::max_element(p_map_.map_.begin(), p_map_.map_.end()) - p_map_.map_.begin());
 };
 
 std::size_t CUDA_simulation::runCudaSimulation(
@@ -1308,11 +1369,10 @@ std::size_t CUDA_simulation::runCudaSimulation(
     
         //update probability particles
         update_particles();
-        //this->p_map_.update(this->env_, this->dt_);
-    
-        //compute probability
+        
+        //compute probability and select current target
         compute_prob_cuda();
-        //this->p_map_.computeProb();
+
     
 
         //CUDA fluid update
@@ -1365,6 +1425,7 @@ CUDA_simulation::~CUDA_simulation(){
     cudaFree(d_p_horizons);
     cudaFree(d_hit_map);
     cudaFree(d_occupancy_maps_);
+    cudaFree(d_occupancy_map);
     cudaFree(d_waypoints_x);
     cudaFree(d_waypoints_y);
     cudaFree(d_best_wp);

@@ -9,7 +9,7 @@ width_(width),
 height_(height),
 num_p_(num_p),
 cell_size_(cell_size),
-map_((width/cell_size_) * (height/cell_size_), 0.f),
+map_((width/cell_size_) * (height/cell_size_), 0u),
 DD_(DD),
 rng_(25),
 p_rad_(p_rad),
@@ -136,12 +136,12 @@ void ProbabilityMap::computeProb(){
             std::size_t cell_index = cell_row * cols + cell_col;
 
             //add new cell to occupied cells list
-            if(map_[cell_index] == 0.f){
+            if(map_[cell_index] == 0){
                 occupied_cells.push_back(cell_index);
             }
 
             //add particle to cell map
-            map_[cell_index] += 1.0f; 
+            map_[cell_index] ++; 
 
 
         }

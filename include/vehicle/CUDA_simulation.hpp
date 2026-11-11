@@ -119,6 +119,7 @@ private:
     //WAYPOINT DEVICES
     float* d_waypoints_x = nullptr;
     float* d_waypoints_y = nullptr;
+    unsigned int* d_occupancy_map = nullptr;
     unsigned int* d_occupancy_maps_ = nullptr;
     std::vector<unsigned int> occupancy_maps_;
     std::size_t candidate_waypoints_ = 3;

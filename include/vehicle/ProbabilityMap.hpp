@@ -25,7 +25,7 @@ public:
     std::vector<PredictionParticle> particles_;
     std::vector<PredictionParticle> particle_buffer;
     std::size_t cell_size_;
-    std::vector<float> map_;
+    std::vector<unsigned int> map_;
     std::size_t num_p_;
     std::vector<std::size_t>occupied_cells;
     
