@@ -16,24 +16,28 @@ struct DriftItem{
 };
 
 struct PredictionParticle{
+    std::size_t ID;
     DriftItem pos;
     float weight;
     float life_;
 
-    PredictionParticle(){
+    PredictionParticle(std::size_t id){
+        ID = id;
         pos.x = 0.f;
         pos.y = 0.f;
         weight = 0.f;
         life_ = 1.f;
     }
 
-    PredictionParticle(float x_pos, float y_pos){
+    PredictionParticle(float x_pos, float y_pos, std::size_t id){
+        ID = id;
         pos.x = x_pos;
         pos.y = y_pos;
         weight = 0.f;
     }
 
-    PredictionParticle(float x_pos, float y_pos, float life){
+    PredictionParticle(float x_pos, float y_pos, float life, std::size_t id){
+        ID = id;
         pos.x = x_pos;
         pos.y = y_pos;
         weight = 0.f;

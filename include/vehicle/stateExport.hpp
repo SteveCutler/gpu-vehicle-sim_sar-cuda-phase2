@@ -52,22 +52,16 @@ inline void exportParticles(
         throw std::runtime_error("Cannot open output file: " + path);
     }
 
-    out << std::setprecision(
-        std::numeric_limits<float>::max_digits10);
+    out << std::setprecision(std::numeric_limits<float>::max_digits10);
+    out << "id,x,y,weight,life\n";
 
-    out << "index,x,y,weight,life\n";
-
-    for (std::size_t i = 0; i < particles.size(); ++i) {
-        const auto& particle = particles[i];
-
-        out << i << ','
+    for (const auto& particle : particles) {
+        out << particle.ID << ','
             << particle.pos.x << ','
             << particle.pos.y << ','
             << particle.weight << ','
             << particle.life_ << '\n';
     }
-
-    out.close();
 
     if (!out) {
         throw std::runtime_error("Failed to write particles: " + path);

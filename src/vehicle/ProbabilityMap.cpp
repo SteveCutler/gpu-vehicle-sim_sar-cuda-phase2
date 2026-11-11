@@ -106,7 +106,7 @@ void ProbabilityMap::add_Particles(){
 
     for(size_t i = 0; i < num_p_; i++){
         particles_.push_back( 
-            PredictionParticle(randomX(rng_), randomY(rng_), randomLife(rng_)) 
+            PredictionParticle(i, randomX(rng_), randomY(rng_), randomLife(rng_)) 
         );
     };
 }
