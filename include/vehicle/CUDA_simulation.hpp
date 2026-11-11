@@ -60,13 +60,15 @@ public:
     void calc_vel(float dt);
     void advect_vel(float dt);
     void diffuse_vel(float dt);
-    void swap_vel(float dt); //helper?
-    void swap_density(float dt); //helper?
-    void scalar_boundaries(float dt); //helper?
+    void swap_vel();
+    void swap_density();
+    void vel_boundaries();
+    void pressure_boundaries();
+    void scalar_boundaries(float* field);
     void project_step();
-    void add_source(float x, float y, float z); // add colour input
-    void diffuse(float dt);
-    void advect_decay(float dt);
+    void add_source(std::size_t x, std::size_t y, float size, Vec3 clr);
+    void diffuse(float dt, const float* source, float*& destination);
+    void advect_decay(float dt, const float* source, float* dest);
 
 
     

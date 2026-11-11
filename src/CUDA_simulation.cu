@@ -645,6 +645,9 @@ void CUDA_simulation::init_simulation(
         CUDA_CHECK(cudaMalloc(&this->d_v_prev_, fluidBytes));
 
 
+        // Initialize all fluid fields once, before the first kernel reads them.
+        HtD_fluid();
+
         //allocate memory to particle device
         CUDA_CHECK(cudaMalloc(&this->d_particles_, pBytes));
         CUDA_CHECK(cudaMalloc(&this->d_remove_particles_, flagBytes));
@@ -766,42 +769,31 @@ void CUDA_simulation::particle_scan(){
 
 }
 void CUDA_simulation::HtD_fluid(){
-    //create devices and allocate vehicle data
-        const std::size_t fluidBytes = this->env_.m_width * this->env_.m_height * sizeof(float);
-     
-        //copy data from host to device
-        CUDA_CHECK(cudaMemcpy(this->d_u_, this->env_.fluid_grid.m_u_velocity.data(), fluidBytes, cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(this->d_v_, this->env_.fluid_grid.m_v_velocity.data(), fluidBytes, cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(this->d_u_prev_, this->env_.fluid_grid.m_u_velocity_prev.data(), fluidBytes, cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(this->d_v_prev_, this->env_.fluid_grid.m_v_velocity_prev.data(), fluidBytes, cudaMemcpyHostToDevice));
-
-        //check for allocation errors
-        cudaError_t error = cudaGetLastError();
-
-        if (error != cudaSuccess) {
-            throw std::runtime_error(cudaGetErrorString(error));
-        }
-
+    const std::size_t fluidBytes = env_.m_width * env_.m_height * sizeof(float);
+    CUDA_CHECK(cudaMemcpy(d_u_, env_.fluid_grid.m_u_velocity.data(), fluidBytes, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_v_, env_.fluid_grid.m_v_velocity.data(), fluidBytes, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_u_prev_, env_.fluid_grid.m_u_velocity_prev.data(), fluidBytes, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_v_prev_, env_.fluid_grid.m_v_velocity_prev.data(), fluidBytes, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_noise_, env_.fluid_grid.m_noise.data(), fluidBytes, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_density_r_, env_.fluid_grid.m_density_r.data(), fluidBytes, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_density_g_, env_.fluid_grid.m_density_g.data(), fluidBytes, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_density_b_, env_.fluid_grid.m_density_b.data(), fluidBytes, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_density_r_prev_, env_.fluid_grid.m_density_r_prev.data(), fluidBytes, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_density_g_prev_, env_.fluid_grid.m_density_g_prev.data(), fluidBytes, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_density_b_prev_, env_.fluid_grid.m_density_b_prev.data(), fluidBytes, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_divergence_, env_.fluid_grid.m_divergence.data(), fluidBytes, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_pressure_, env_.fluid_grid.m_pressure.data(), fluidBytes, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_pressure_prev_, env_.fluid_grid.m_pressure_prev.data(), fluidBytes, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_diffusion_scratch_, env_.fluid_grid.m_diffusion_scratch.data(), fluidBytes, cudaMemcpyHostToDevice));
 }
 
 void CUDA_simulation::DtH_fluid(){
-
-    //copy vehicle data from device to host
-    const std::size_t fluidBytes = this->env_.m_width * this->env_.m_height * sizeof(float);
-    CUDA_CHECK(cudaMemcpy(this->env_.fluid_grid.m_u_velocity.data(), this->d_u_, fluidBytes, cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaMemcpy(this->env_.fluid_grid.m_v_velocity.data(), this->d_v_, fluidBytes, cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaMemcpy(this->env_.fluid_grid.m_u_velocity_prev.data(), this->d_u_prev_, fluidBytes, cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaMemcpy(this->env_.fluid_grid.m_v_velocity_prev.data(),this->d_v_prev_, fluidBytes, cudaMemcpyDeviceToHost));
-
-        //check for allocation errors
-    cudaError_t error = cudaGetLastError();
-
-    if (error != cudaSuccess) {
-        throw std::runtime_error(cudaGetErrorString(error));
-    }
+    const std::size_t fluidBytes = env_.m_width * env_.m_height * sizeof(float);
+    CUDA_CHECK(cudaMemcpy(env_.fluid_grid.m_u_velocity.data(), d_u_, fluidBytes, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(env_.fluid_grid.m_v_velocity.data(), d_v_, fluidBytes, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(env_.fluid_grid.m_u_velocity_prev.data(), d_u_prev_, fluidBytes, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(env_.fluid_grid.m_v_velocity_prev.data(), d_v_prev_, fluidBytes, cudaMemcpyDeviceToHost));
 }
-
-
 
 void CUDA_simulation::step_vehicles(){
         if(v_count_ == 0) return;
@@ -1089,9 +1081,8 @@ std::size_t CUDA_simulation::runCudaSimulation(
     //run sim for steps amount of steps
     while(curr_step < steps){
         
-        //copy vehicles and fluid data to GPU
+        // Fluid fields stay on the GPU between steps.
         HtD_vehicles(vehicles);
-        HtD_fluid();
         //advance vehicles
         step_vehicles();
 
@@ -1193,6 +1184,17 @@ CUDA_simulation::~CUDA_simulation(){
         d_v_,
         d_u_prev_,
         d_v_prev_,
+        d_noise_,
+        d_density_r_,
+        d_density_g_,
+        d_density_b_,
+        d_density_r_prev_,
+        d_density_g_prev_,
+        d_density_b_prev_,
+        d_divergence_,
+        d_pressure_,
+        d_pressure_prev_,
+        d_diffusion_scratch_,
     };
     //free float array pointers
     for (float* ptr : allocations){

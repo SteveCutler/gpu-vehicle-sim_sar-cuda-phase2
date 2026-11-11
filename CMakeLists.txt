@@ -46,7 +46,7 @@ fluid_core
 )
 
 if(ENABLE_CUDA)
-    # Only vehicle motion is ported; fluid, particles and planning use the CPU code.
+    # CUDA vehicle, scan, planning and fluid kernels.
     target_sources(vehicle_sim PRIVATE
         src/vehicle/controller.cu
         src/vehicle/dynamics.cu
