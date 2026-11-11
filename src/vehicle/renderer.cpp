@@ -7,6 +7,7 @@
 #include "vehicle/environment.hpp"
 #include "vehicle/DriftItem.hpp"
 #include "vehicle/ProbabilityMap.hpp"
+#include "vehicle/routeData.hpp"
 
 Renderer::Renderer(std::size_t width, std::size_t height, bool arrow_viz, std::size_t cell_size):
 m_width(width),

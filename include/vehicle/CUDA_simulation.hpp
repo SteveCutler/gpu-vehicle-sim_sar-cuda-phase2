@@ -41,19 +41,33 @@ public:
     void init_simulation(vehicleBatch& vehicles);
     void HtD_vehicles(const vehicleBatch& vehicles);
     void DtH_vehicles(vehicleBatch& vehicles);
+
     void step_vehicles();
 
     void calc_p_horizon(std::size_t steps);
+    void particle_scan();
     void find_waypoints();
     void calc_occ_maps(std::size_t steps, std::size_t p_count);
     void calc_paths(vehicleBatch& vehicles, std::size_t steps, std::size_t p_count);
     void score_paths(vehicleBatch& vehicles);
     std::pair<float,float> convert_cell(std::size_t cell);
 
+    void step_fluid(float dt);
     void HtD_fluid();
     void DtH_fluid();
 
-    void particle_scan();
+    void calc_noise(float dt);
+    void calc_vel(float dt);
+    void advect_vel(float dt);
+    void diffuse_vel(float dt);
+    void swap_vel(float dt); //helper?
+    void swap_density(float dt); //helper?
+    void scalar_boundaries(float dt); //helper?
+    void project_step();
+    void add_source(float x, float y, float z); // add colour input
+    void diffuse(float dt);
+    void advect_decay(float dt);
+
 
     
 
@@ -74,7 +88,7 @@ private:
 
 
 
-    //vehicle pointer vars
+    //VEHICLE POINTER VARS
     float* vs_x = nullptr;
     float* vs_y = nullptr;
     float* vs_vx = nullptr;
@@ -85,13 +99,31 @@ private:
     float* vs_goaly = nullptr;
     float sensor_radius_ = 0;
 
-    //fluid pointer vars
+    //FLUID POINTER VARS
+    // Noise used to generate the velocity disturbance
+    float* d_noise_ = nullptr;
+    float elapsed_dt = 0.f;
+
+    // density
+    float* d_density_r_ = nullptr;
+    float* d_density_g_ = nullptr;
+    float* d_density_b_ = nullptr;
+    float* d_density_r_prev_ = nullptr;
+    float* d_density_g_prev_ = nullptr;
+    float* d_density_b_prev_ = nullptr;
+
+    // Projection
+    float* d_divergence_ = nullptr;
+    float* d_pressure_ = nullptr;
+    float* d_pressure_prev_ = nullptr;
+    float* d_diffusion_scratch_ = nullptr;
+
     float* d_u_ = nullptr;
     float* d_v_ = nullptr;
     float* d_u_prev_ = nullptr;
     float* d_v_prev_ = nullptr;
 
-    //waypoint devict
+    //WAYPOINT DEVICES
     float* d_waypoints_x = nullptr;
     float* d_waypoints_y = nullptr;
     unsigned int* d_occupancy_maps_ = nullptr;
@@ -99,7 +131,7 @@ private:
     std::size_t candidate_waypoints_ = 3;
     unsigned int* d_best_wp = nullptr;
 
-    //particle device pointer
+    //PARTICLE POINTER VARS
     PredictionParticle* d_particles_ = nullptr;
     unsigned char* d_remove_particles_ = nullptr;
     PredictionParticle* d_p_horizons = nullptr;

@@ -51,6 +51,7 @@ if(ENABLE_CUDA)
         src/vehicle/controller.cu
         src/vehicle/dynamics.cu
         src/CUDA_simulation.cu
+        src/fluid/FluidGrid_Cuda.cu
     )
 
     target_link_libraries(fluid_core PRIVATE CUDA::cudart)

@@ -5,6 +5,7 @@
 #include "vehicle/vehicleBatch.hpp"
 #include "vehicle/DriftItem.hpp"
 #include "vehicle/ProbabilityMap.hpp"
+#include "vehicle/routeData.hpp"
 
 class Renderer
 {

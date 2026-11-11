@@ -14,13 +14,13 @@
 #include <algorithm>
 #include <string>
 
-inline void cudaCheck(cudaError_t result, const char* expression, int line){
-    if(result != cudaSuccess){
-        throw std::runtime_error(std::string(__FILE__) + ":" + std::to_string(line)
-            + " " + expression + ": " + cudaGetErrorString(result));
+//cuda error check function, wrapping all mallocs and transfers with it
+inline void cudaCheck(cudaError_t error) {
+    if (error != cudaSuccess) {
+        throw std::runtime_error(cudaGetErrorString(error));
     }
 }
-#define CUDA_CHECK(expression) cudaCheck((expression), #expression, __LINE__)
+#define CUDA_CHECK(call) cudaCheck(call)
 
 //velocity field sample device helper function
 __device__ cuda::std::pair<float,float> vel_sample(    
@@ -622,6 +622,23 @@ void CUDA_simulation::init_simulation(
         
         
         //allocate memory to devices for fluid fields
+        CUDA_CHECK(cudaMalloc(&this->d_noise_, fluidBytes));
+
+        // density
+        CUDA_CHECK(cudaMalloc(&this->d_density_r_, fluidBytes));
+        CUDA_CHECK(cudaMalloc(&this->d_density_g_, fluidBytes));
+        CUDA_CHECK(cudaMalloc(&this->d_density_b_, fluidBytes));
+        CUDA_CHECK(cudaMalloc(&this->d_density_r_prev_, fluidBytes));
+        CUDA_CHECK(cudaMalloc(&this->d_density_g_prev_, fluidBytes));
+        CUDA_CHECK(cudaMalloc(&this->d_density_b_prev_, fluidBytes));
+        
+        
+        // Projection
+        CUDA_CHECK(cudaMalloc(&this->d_divergence_, fluidBytes));
+        CUDA_CHECK(cudaMalloc(&this->d_pressure_, fluidBytes));
+        CUDA_CHECK(cudaMalloc(&this->d_pressure_prev_, fluidBytes));
+        CUDA_CHECK(cudaMalloc(&this->d_diffusion_scratch_, fluidBytes));
+
         CUDA_CHECK(cudaMalloc(&this->d_u_, fluidBytes));
         CUDA_CHECK(cudaMalloc(&this->d_v_, fluidBytes));
         CUDA_CHECK(cudaMalloc(&this->d_u_prev_, fluidBytes));
@@ -1138,6 +1155,7 @@ std::size_t CUDA_simulation::runCudaSimulation(
         
         
 
+        // STILL NEED TO BE PORTED TO CUDA
 
         //update target location
         this->p_map_.DD_.DriftUpdate(this->target_, env_.getDisturbance(this->target_.x, this->target_.y, 0.0f), this->dt_);
@@ -1148,7 +1166,9 @@ std::size_t CUDA_simulation::runCudaSimulation(
         //compute probability
         this->p_map_.computeProb();
     
-        this->env_.update_fluid(this->dt_);
+
+        //CUDA fluid update
+        step_fluid(this->dt_);
     
     
         curr_step++;

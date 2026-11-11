@@ -132,7 +132,7 @@ int main(int argNum, char* argVals[]){
     Action action;
     VehicleState newState;
     //init planner, horizon of 50 steps
-    SearchPlanner planner(50);
+    SearchPlanner planner(50, N);
 
    
 
@@ -222,7 +222,7 @@ int main(int argNum, char* argVals[]){
                 ++curr_step;
 
                 #ifdef ENABLE_RENDERER
-                    if(!renderer.draw(vehicles, dt, curr_step, env, target, p_map)){
+                    if(!renderer.draw(vehicles, dt, curr_step, env, target, p_map, planner.plannerPreview)){
                         break;
                     }
                 #endif

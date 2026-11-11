@@ -5,6 +5,7 @@
 #include "vehicle/dynamics.hpp"
 #include "vehicle/controller.hpp"
 #include <vector>
+#include "vehicle/routeData.hpp"
 
 class SearchPlanner
 {
@@ -17,17 +18,18 @@ private:
     std::size_t w_index_;
     
     public:
-    SearchPlanner(std::size_t horizon);
+    SearchPlanner(std::size_t horizon, std::size_t v_num);
     
     std::pair<float,float> chooseWaypoint(VehicleState vs, 
-        const std::vector<PredictionParticle>& particles, 
-        const environment& env, 
-        const float dt,
-        ProbabilityMap& tempMap,
-        Dynamics& dynamics,
-        Controller& controller,
-        std::size_t height_);
-        ~SearchPlanner() = default;
-        
-        std::vector<std::pair<float,float>> wayPoints;
+    const std::vector<PredictionParticle>& particles, 
+    const environment& env, 
+    const float dt,
+    ProbabilityMap& tempMap,
+    Dynamics& dynamics,
+    Controller& controller,
+    std::size_t height_);
+    ~SearchPlanner() = default;
+
+    std::vector<std::pair<float,float>> wayPoints;
+    PlannerPreview preview;
 };
