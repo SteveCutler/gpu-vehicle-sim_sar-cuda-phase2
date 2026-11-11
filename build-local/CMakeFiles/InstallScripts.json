@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation Phase2/gpu-vehicle-sim_sar-cuda/build-local/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

@@ -207,7 +207,7 @@ int main(int argNum, char* argVals[]){
                         newState = vehicles.load(x);
                         const auto newWP = planner.chooseWaypoint(
                             newState, p_map.particles_, env, dt, tempMap,
-                            dynamics, controller, height);
+                            dynamics, controller, height, x);
                         newState.goalx = newWP.first;
                         newState.goaly = newWP.second;
                         vehicles.set(x, newState);
@@ -222,7 +222,7 @@ int main(int argNum, char* argVals[]){
                 ++curr_step;
 
                 #ifdef ENABLE_RENDERER
-                    if(!renderer.draw(vehicles, dt, curr_step, env, target, p_map, planner.plannerPreview)){
+                    if(!renderer.draw(vehicles, dt, curr_step, env, target, p_map, planner.preview)){
                         break;
                     }
                 #endif
@@ -256,7 +256,7 @@ int main(int argNum, char* argVals[]){
 
     // Keep showing the final state and handling window events.
     #ifdef ENABLE_RENDERER
-    while (renderer.draw(vehicles, dt, curr_step, env, target, p_map)) {}
+    while (renderer.draw(vehicles, dt, curr_step, env, target, p_map, planner.preview)) {}
     #endif
 
  

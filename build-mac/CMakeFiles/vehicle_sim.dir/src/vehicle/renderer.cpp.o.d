@@ -933,13 +933,14 @@ CMakeFiles/vehicle_sim.dir/src/vehicle/renderer.cpp.o: \
   /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/vehicle/vehicleBatch.hpp \
   /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/vehicle/environment.hpp \
   /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/fluid/FluidGrid.hpp \
-  /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/../include/fluid/FastNoiseLite.h \
-  /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/../include/fluid/Emitter.hpp \
+  /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/fluid/FastNoiseLite.h \
+  /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/fluid/Emitter.hpp \
+  /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/fluid/FluidTypes.hpp \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/thread \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__thread/this_thread.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__thread/thread.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/sstream \
-  /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/fluid/Emitter.hpp \
+  /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/PerformanceClock.hpp \
   /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/vehicle/ProbabilityMap.hpp \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/random \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/bernoulli_distribution.h \
@@ -995,4 +996,5 @@ CMakeFiles/vehicle_sim.dir/src/vehicle/renderer.cpp.o: \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/weibull_distribution.h \
   /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/vehicle/DriftItem.hpp \
   /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/vehicle/DriftDynamics.hpp \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/iostream
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/iostream \
+  /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/vehicle/routeData.hpp

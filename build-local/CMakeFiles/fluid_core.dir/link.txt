@@ -1,0 +1,2 @@
+/usr/bin/ar qc libfluid_core.a CMakeFiles/fluid_core.dir/src/fluid/FluidGrid.cpp.o CMakeFiles/fluid_core.dir/src/fluid/Emitter.cpp.o
+/usr/bin/ranlib libfluid_core.a

@@ -20,9 +20,12 @@ private:
     sf::VertexArray m_p_grid;
     sf::RenderWindow m_window;
 
+    void drawPath(const std::vector<RoutePoint>& path, sf::Color colour, bool vehicleCoordinates);
+    void drawPreview(const PlannerPreview& preview);
+
 public:
     Renderer(std::size_t width, std::size_t height, bool arrow_viz, std::size_t cell_size);
-    bool draw(const vehicleBatch& vehicles, float dt, std::size_t curr_step, const environment& env, const DriftItem& target, const ProbabilityMap& p_map);
+    bool draw(const vehicleBatch& vehicles, float dt, std::size_t curr_step, const environment& env, const DriftItem& target, const ProbabilityMap& p_map, const PlannerPreview& preview);
     ~Renderer() = default;
 };
 

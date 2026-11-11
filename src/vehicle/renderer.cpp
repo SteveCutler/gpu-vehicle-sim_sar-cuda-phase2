@@ -54,7 +54,7 @@ m_window(sf::VideoMode({m_width, m_height}), "Search&Rescue Sim")
 
 };
 
-bool Renderer::draw(const vehicleBatch& vehicles, float dt, std::size_t curr_step, const environment& env, const DriftItem& target, const ProbabilityMap& p_map){
+bool Renderer::draw(const vehicleBatch& vehicles, float dt, std::size_t curr_step, const environment& env, const DriftItem& target, const ProbabilityMap& p_map, const PlannerPreview& preview){
 
     //check if window has been closed:
     while (auto event = m_window.pollEvent()) {
@@ -192,6 +192,8 @@ bool Renderer::draw(const vehicleBatch& vehicles, float dt, std::size_t curr_ste
     //     m_window.draw(particleShape);
     // }
 
+    drawPreview(preview);
+
         // Load and render vehicle data
     for(int i = 0; i<count; i++){
         VehicleState s = vehicles.load(i);
@@ -233,3 +235,40 @@ bool Renderer::draw(const vehicleBatch& vehicles, float dt, std::size_t curr_ste
 
 
 };
+
+void Renderer::drawPath(const std::vector<RoutePoint>& path, sf::Color colour, bool vehicleCoordinates){
+    if(path.size() < 2){
+        return;
+    }
+
+    sf::VertexArray line(sf::PrimitiveType::LineStrip, path.size());
+    for(std::size_t i = 0; i < path.size(); i++){
+        float y = path[i].y;
+        if(vehicleCoordinates){
+            y = static_cast<float>(m_height) - y;
+        }
+        line[i].position = {path[i].x, y};
+        line[i].color = colour;
+    }
+    m_window.draw(line);
+}
+
+void Renderer::drawPreview(const PlannerPreview& preview){
+    //Particle predictions already use the same coordinates as the fluid display.
+    for(const auto& path : preview.particles){
+        drawPath(path, sf::Color(80, 255, 120, 100), false);
+    }
+
+    for(const auto& vehicle : preview.vehicles){
+        for(std::size_t w = 0; w < vehicle.candidates.size(); w++){
+            if(w != vehicle.selected){
+                drawPath(vehicle.candidates[w], sf::Color(255, 170, 60, 140), true);
+            }
+        }
+
+        //Draw the chosen path last so overlapping alternatives do not hide it.
+        if(vehicle.selected < vehicle.candidates.size()){
+            drawPath(vehicle.candidates[vehicle.selected], sf::Color::Cyan, true);
+        }
+    }
+}

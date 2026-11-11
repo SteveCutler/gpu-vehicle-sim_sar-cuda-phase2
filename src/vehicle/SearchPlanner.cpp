@@ -4,12 +4,15 @@
 #include <set>
 #include <algorithm>
 
-SearchPlanner::SearchPlanner(std::size_t horizon):
+SearchPlanner::SearchPlanner(std::size_t horizon, std::size_t v_num):
 horizon_(horizon),
 w_index_(0)
 {
     // + 1 because the first index is the current position
     forecast_.resize(horizon_ + 1);
+    #ifdef ENABLE_RENDERER
+    preview.vehicles.resize(v_num);
+    #endif
 }
 
 std::pair<float,float> SearchPlanner::chooseWaypoint(VehicleState vs, 
@@ -19,7 +22,8 @@ std::pair<float,float> SearchPlanner::chooseWaypoint(VehicleState vs,
     ProbabilityMap& tempMap,
     Dynamics& dynamics,
     Controller& controller,
-    std::size_t height_){
+    std::size_t height_,
+    std::size_t vehicleIndex){
         //push back current waypoint as a candidate
         wayPoints.push_back({vs.goalx,vs.goaly});
 
@@ -44,6 +48,25 @@ std::pair<float,float> SearchPlanner::chooseWaypoint(VehicleState vs,
             
         }
 
+        #ifdef ENABLE_RENDERER
+        //All vehicles use the same particle forecast, so save this once per replan.
+        if(vehicleIndex == 0){
+            std::size_t sample_count = std::min<std::size_t>(32, particles.size());
+            preview.particles.resize(sample_count);
+
+            for(std::size_t p = 0; p < sample_count; p++){
+                std::size_t particle_index = p * particles.size() / sample_count;
+                auto& path = preview.particles[p];
+                path.resize(horizon_ + 1);
+
+                for(std::size_t step = 0; step <= horizon_; step++){
+                    path[step] = {forecast_[step][particle_index].pos.x,
+                                  forecast_[step][particle_index].pos.y};
+                }
+            }
+        }
+        #endif
+
         //build occupancy maps for various keyframes in horizon, 
         //calc waypoint halfway through horizon
         tempMap.particles_ = forecast_[horizon_/2];
@@ -58,6 +81,14 @@ std::pair<float,float> SearchPlanner::chooseWaypoint(VehicleState vs,
         wayPoints.push_back(
             tempMap.convertCell(tempMap.target_cell)
         );
+
+        #ifdef ENABLE_RENDERER
+        auto& vehiclePreview = preview.vehicles[vehicleIndex];
+        vehiclePreview.candidates.resize(wayPoints.size());
+        for(auto& path : vehiclePreview.candidates){
+            path.resize(horizon_ + 1);
+        }
+        #endif
 
         //reserve space for wp count
         wpCount_.resize(wayPoints.size());
@@ -77,10 +108,18 @@ std::pair<float,float> SearchPlanner::chooseWaypoint(VehicleState vs,
             simVehicle.goalx = wayPoints[w].first;
             simVehicle.goaly = wayPoints[w].second;
 
+            #ifdef ENABLE_RENDERER
+            vehiclePreview.candidates[w][0] = {simVehicle.x, simVehicle.y};
+            #endif
+
             for(int step = 1; step <= horizon_; step++){
 
                 //calculate new state
                 simVehicle = dynamics.step_update(simVehicle, controller.steer_controller(simVehicle), env, dt, step);
+
+                #ifdef ENABLE_RENDERER
+                vehiclePreview.candidates[w][step] = {simVehicle.x, simVehicle.y};
+                #endif
 
                 //scan for particles at this step within sensor range
 
@@ -107,6 +146,10 @@ std::pair<float,float> SearchPlanner::chooseWaypoint(VehicleState vs,
         const auto best = std::max_element(wpCount_.begin(), wpCount_.end());
         const auto bestIndex = best - wpCount_.begin();
         const auto new_WP = wayPoints[bestIndex];
+
+        #ifdef ENABLE_RENDERER
+        vehiclePreview.selected = static_cast<std::size_t>(bestIndex);
+        #endif
 
         //set new waypoint
 

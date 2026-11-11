@@ -198,24 +198,10 @@ CMakeFiles/vehicle_sim.dir/src/vehicle/renderer.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/vehicle_sim.dir/src/vehicle/renderer.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S "/Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation Phase2/gpu-vehicle-sim_sar-cuda/src/vehicle/renderer.cpp" -o CMakeFiles/vehicle_sim.dir/src/vehicle/renderer.cpp.s
 
-CMakeFiles/vehicle_sim.dir/src/fluid/FluidGrid.cpp.o: CMakeFiles/vehicle_sim.dir/flags.make
-CMakeFiles/vehicle_sim.dir/src/fluid/FluidGrid.cpp.o: /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/src/fluid/FluidGrid.cpp
-CMakeFiles/vehicle_sim.dir/src/fluid/FluidGrid.cpp.o: CMakeFiles/vehicle_sim.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir="/Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation Phase2/gpu-vehicle-sim_sar-cuda/build-mac/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_10) "Building CXX object CMakeFiles/vehicle_sim.dir/src/fluid/FluidGrid.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/vehicle_sim.dir/src/fluid/FluidGrid.cpp.o -MF CMakeFiles/vehicle_sim.dir/src/fluid/FluidGrid.cpp.o.d -o CMakeFiles/vehicle_sim.dir/src/fluid/FluidGrid.cpp.o -c "/Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation Phase2/gpu-vehicle-sim_sar-cuda/src/fluid/FluidGrid.cpp"
-
-CMakeFiles/vehicle_sim.dir/src/fluid/FluidGrid.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/vehicle_sim.dir/src/fluid/FluidGrid.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E "/Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation Phase2/gpu-vehicle-sim_sar-cuda/src/fluid/FluidGrid.cpp" > CMakeFiles/vehicle_sim.dir/src/fluid/FluidGrid.cpp.i
-
-CMakeFiles/vehicle_sim.dir/src/fluid/FluidGrid.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/vehicle_sim.dir/src/fluid/FluidGrid.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S "/Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation Phase2/gpu-vehicle-sim_sar-cuda/src/fluid/FluidGrid.cpp" -o CMakeFiles/vehicle_sim.dir/src/fluid/FluidGrid.cpp.s
-
 CMakeFiles/vehicle_sim.dir/src/fluid/Slider.cpp.o: CMakeFiles/vehicle_sim.dir/flags.make
 CMakeFiles/vehicle_sim.dir/src/fluid/Slider.cpp.o: /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/src/fluid/Slider.cpp
 CMakeFiles/vehicle_sim.dir/src/fluid/Slider.cpp.o: CMakeFiles/vehicle_sim.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir="/Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation Phase2/gpu-vehicle-sim_sar-cuda/build-mac/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_11) "Building CXX object CMakeFiles/vehicle_sim.dir/src/fluid/Slider.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir="/Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation Phase2/gpu-vehicle-sim_sar-cuda/build-mac/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_10) "Building CXX object CMakeFiles/vehicle_sim.dir/src/fluid/Slider.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/vehicle_sim.dir/src/fluid/Slider.cpp.o -MF CMakeFiles/vehicle_sim.dir/src/fluid/Slider.cpp.o.d -o CMakeFiles/vehicle_sim.dir/src/fluid/Slider.cpp.o -c "/Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation Phase2/gpu-vehicle-sim_sar-cuda/src/fluid/Slider.cpp"
 
 CMakeFiles/vehicle_sim.dir/src/fluid/Slider.cpp.i: cmake_force
@@ -237,7 +223,6 @@ vehicle_sim_OBJECTS = \
 "CMakeFiles/vehicle_sim.dir/src/vehicle/ProbabilityMap.cpp.o" \
 "CMakeFiles/vehicle_sim.dir/src/vehicle/SearchPlanner.cpp.o" \
 "CMakeFiles/vehicle_sim.dir/src/vehicle/renderer.cpp.o" \
-"CMakeFiles/vehicle_sim.dir/src/fluid/FluidGrid.cpp.o" \
 "CMakeFiles/vehicle_sim.dir/src/fluid/Slider.cpp.o"
 
 # External object files for target vehicle_sim
@@ -252,7 +237,6 @@ vehicle_sim: CMakeFiles/vehicle_sim.dir/src/vehicle/DriftDynamics.cpp.o
 vehicle_sim: CMakeFiles/vehicle_sim.dir/src/vehicle/ProbabilityMap.cpp.o
 vehicle_sim: CMakeFiles/vehicle_sim.dir/src/vehicle/SearchPlanner.cpp.o
 vehicle_sim: CMakeFiles/vehicle_sim.dir/src/vehicle/renderer.cpp.o
-vehicle_sim: CMakeFiles/vehicle_sim.dir/src/fluid/FluidGrid.cpp.o
 vehicle_sim: CMakeFiles/vehicle_sim.dir/src/fluid/Slider.cpp.o
 vehicle_sim: CMakeFiles/vehicle_sim.dir/build.make
 vehicle_sim: libfluid_core.a
@@ -260,7 +244,7 @@ vehicle_sim: /opt/homebrew/lib/libsfml-graphics.3.0.2.dylib
 vehicle_sim: /opt/homebrew/lib/libsfml-window.3.0.2.dylib
 vehicle_sim: /opt/homebrew/lib/libsfml-system.3.0.2.dylib
 vehicle_sim: CMakeFiles/vehicle_sim.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir="/Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation Phase2/gpu-vehicle-sim_sar-cuda/build-mac/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_12) "Linking CXX executable vehicle_sim"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir="/Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation Phase2/gpu-vehicle-sim_sar-cuda/build-mac/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_11) "Linking CXX executable vehicle_sim"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/vehicle_sim.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.

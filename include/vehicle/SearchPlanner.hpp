@@ -27,7 +27,8 @@ private:
     ProbabilityMap& tempMap,
     Dynamics& dynamics,
     Controller& controller,
-    std::size_t height_);
+    std::size_t height_,
+    std::size_t vehicleIndex);
     ~SearchPlanner() = default;
 
     std::vector<std::pair<float,float>> wayPoints;

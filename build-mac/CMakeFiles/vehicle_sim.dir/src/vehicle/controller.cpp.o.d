@@ -789,22 +789,9 @@ CMakeFiles/vehicle_sim.dir/src/vehicle/controller.cpp.o: \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/cstdarg \
   /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/vehicle/environment.hpp \
   /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/fluid/FluidGrid.hpp \
-  /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/../include/fluid/FastNoiseLite.h \
-  /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/../include/fluid/Emitter.hpp \
-  /opt/homebrew/include/SFML/System/Vector3.hpp \
-  /opt/homebrew/include/SFML/System/Export.hpp \
-  /opt/homebrew/include/SFML/Config.hpp \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/TargetConditionals.h \
-  /opt/homebrew/include/SFML/System/Vector3.inl \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/cassert \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/assert.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/_static_assert.h \
-  /opt/homebrew/include/SFML/System/Vector2.hpp \
-  /opt/homebrew/include/SFML/System/Angle.hpp \
-  /opt/homebrew/include/SFML/System/Angle.inl \
-  /opt/homebrew/include/SFML/System/Vector2.inl \
-  /opt/homebrew/include/SFML/Graphics/Color.hpp \
-  /opt/homebrew/include/SFML/Graphics/Color.inl \
+  /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/fluid/FastNoiseLite.h \
+  /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/fluid/Emitter.hpp \
+  /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/fluid/FluidTypes.hpp \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/thread \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__thread/this_thread.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__thread/thread.h \
@@ -852,93 +839,7 @@ CMakeFiles/vehicle_sim.dir/src/vehicle/controller.cpp.o: \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/chrono \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__chrono/file_clock.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/forward_list \
-  /opt/homebrew/include/SFML/System/Clock.hpp \
-  /opt/homebrew/include/SFML/Graphics.hpp \
-  /opt/homebrew/include/SFML/Graphics/BlendMode.hpp \
-  /opt/homebrew/include/SFML/Graphics/Export.hpp \
-  /opt/homebrew/include/SFML/Graphics/CircleShape.hpp \
-  /opt/homebrew/include/SFML/Graphics/Shape.hpp \
-  /opt/homebrew/include/SFML/Graphics/Drawable.hpp \
-  /opt/homebrew/include/SFML/Graphics/PrimitiveType.hpp \
-  /opt/homebrew/include/SFML/Graphics/Rect.hpp \
-  /opt/homebrew/include/SFML/Graphics/Rect.inl \
-  /opt/homebrew/include/SFML/Graphics/RenderStates.hpp \
-  /opt/homebrew/include/SFML/Graphics/CoordinateType.hpp \
-  /opt/homebrew/include/SFML/Graphics/StencilMode.hpp \
-  /opt/homebrew/include/SFML/Graphics/Transform.hpp \
-  /opt/homebrew/include/SFML/Graphics/Transform.inl \
-  /opt/homebrew/include/SFML/Graphics/Transformable.hpp \
-  /opt/homebrew/include/SFML/Graphics/VertexArray.hpp \
-  /opt/homebrew/include/SFML/Graphics/Vertex.hpp \
-  /opt/homebrew/include/SFML/Graphics/ConvexShape.hpp \
-  /opt/homebrew/include/SFML/Graphics/Font.hpp \
-  /opt/homebrew/include/SFML/Graphics/Glyph.hpp \
-  /opt/homebrew/include/SFML/Graphics/Texture.hpp \
-  /opt/homebrew/include/SFML/Window/GlResource.hpp \
-  /opt/homebrew/include/SFML/Window/Export.hpp \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/filesystem \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__filesystem/copy_options.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__filesystem/directory_entry.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__filesystem/file_status.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__filesystem/file_type.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__filesystem/perms.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__filesystem/file_time_type.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__filesystem/filesystem_error.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__filesystem/path.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/iomanip \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__filesystem/operations.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__filesystem/perm_options.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__filesystem/space_info.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__filesystem/directory_iterator.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__filesystem/directory_options.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__filesystem/path_iterator.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__filesystem/recursive_directory_iterator.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__filesystem/u8path.h \
-  /opt/homebrew/include/SFML/Graphics/Image.hpp \
-  /opt/homebrew/include/SFML/Graphics/RectangleShape.hpp \
-  /opt/homebrew/include/SFML/Graphics/RenderTarget.hpp \
-  /opt/homebrew/include/SFML/Graphics/View.hpp \
-  /opt/homebrew/include/SFML/Graphics/RenderTexture.hpp \
-  /opt/homebrew/include/SFML/Window/ContextSettings.hpp \
-  /opt/homebrew/include/SFML/Graphics/RenderWindow.hpp \
-  /opt/homebrew/include/SFML/Window/VideoMode.hpp \
-  /opt/homebrew/include/SFML/Window/Window.hpp \
-  /opt/homebrew/include/SFML/Window/WindowBase.hpp \
-  /opt/homebrew/include/SFML/Window/Vulkan.hpp \
-  /opt/homebrew/include/SFML/Window/WindowEnums.hpp \
-  /opt/homebrew/include/SFML/Window/WindowHandle.hpp \
-  /opt/homebrew/include/SFML/System/Time.hpp \
-  /opt/homebrew/include/SFML/System/Time.inl \
-  /opt/homebrew/include/SFML/Window/WindowBase.inl \
-  /opt/homebrew/include/SFML/Window/Event.hpp \
-  /opt/homebrew/include/SFML/Window/Joystick.hpp \
-  /opt/homebrew/include/SFML/System/String.hpp \
-  /opt/homebrew/include/SFML/System/Utf.hpp \
-  /opt/homebrew/include/SFML/System/Utf.inl \
-  /opt/homebrew/include/SFML/System/String.inl \
-  /opt/homebrew/include/SFML/Window/Keyboard.hpp \
-  /opt/homebrew/include/SFML/Window/Mouse.hpp \
-  /opt/homebrew/include/SFML/Window/Sensor.hpp \
-  /opt/homebrew/include/SFML/Window/Event.inl \
-  /opt/homebrew/include/SFML/Graphics/Shader.hpp \
-  /opt/homebrew/include/SFML/Graphics/Glsl.hpp \
-  /opt/homebrew/include/SFML/Graphics/Glsl.inl \
-  /opt/homebrew/include/SFML/Graphics/Sprite.hpp \
-  /opt/homebrew/include/SFML/Graphics/Text.hpp \
-  /opt/homebrew/include/SFML/Graphics/VertexBuffer.hpp \
-  /opt/homebrew/include/SFML/Window.hpp \
-  /opt/homebrew/include/SFML/Window/Clipboard.hpp \
-  /opt/homebrew/include/SFML/Window/Context.hpp \
-  /opt/homebrew/include/SFML/Window/Cursor.hpp \
-  /opt/homebrew/include/SFML/Window/Touch.hpp \
-  /opt/homebrew/include/SFML/System.hpp \
-  /opt/homebrew/include/SFML/System/Err.hpp \
-  /opt/homebrew/include/SFML/System/Exception.hpp \
-  /opt/homebrew/include/SFML/System/FileInputStream.hpp \
-  /opt/homebrew/include/SFML/System/InputStream.hpp \
-  /opt/homebrew/include/SFML/System/MemoryInputStream.hpp \
-  /opt/homebrew/include/SFML/System/Sleep.hpp \
-  /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/fluid/Emitter.hpp \
+  /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/PerformanceClock.hpp \
   /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/vehicle/vehicleTypes.hpp \
   /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/vehicle/ProbabilityMap.hpp \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/random \
@@ -995,4 +896,5 @@ CMakeFiles/vehicle_sim.dir/src/vehicle/controller.cpp.o: \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/weibull_distribution.h \
   /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/vehicle/DriftItem.hpp \
   /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/vehicle/DriftDynamics.hpp \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/iostream
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/iostream \
+  /Users/stevecutler/Documents/UVIC/Classes/GPUcomputing/Implementation\ Phase2/gpu-vehicle-sim_sar-cuda/include/vehicle/constants.hpp
