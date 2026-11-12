@@ -153,7 +153,7 @@ int main(int argNum, char* argVals[]){
 
         //config file setter for experimentation
         if (argNum > 4) {
-            CudaSim.setConfig(loadExperimentConfig(argv[4]));
+            CudaSim.setConfig(loadExperimentConfig(argVals[4]));
         }
 
         CudaSim.init_simulation(vehicles);
