@@ -53,6 +53,8 @@ public:
     void score_paths(vehicleBatch& vehicles);
     std::pair<float,float> convert_cell(std::size_t cell);
     void update_particles();
+    void particle_cull_atomic();
+    void particle_cull_prefix();
     void compute_prob_cuda();
 
     void step_fluid(float dt);
@@ -147,9 +149,11 @@ private:
     PredictionParticle* d_particle_buffer_ = nullptr;
     unsigned int* d_remainder = nullptr;
     unsigned char* d_remove_particles_ = nullptr;
+    unsigned int* d_dead_prefix = nullptr;
     PredictionParticle* d_p_horizons = nullptr;
     std::vector<PredictionParticle> horizons_;
     unsigned char* d_hit_map = nullptr;
+    unsigned int* d_local_totals = nullptr;
 
     std::size_t cell_count_;
     std::size_t v_count_;

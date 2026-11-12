@@ -201,6 +201,48 @@ __global__ void pressure_kernel(const float *m_pressure_prev, const float *m_div
 
     m_pressure[index] = pressure;
 }
+__global__ void pressure_kernel_tiled(
+    const float* pressure_prev, 
+    const float* divergence,
+    float* pressure, 
+    std::size_t width, 
+    std::size_t height) {
+
+    // shared memory tile def, 1 halo cell on each side so +2 per dimension
+    __shared__ float tile[18][18];
+    
+    //calc index
+    int glob_x = 1 + threadIdx.x + blockDim.x * blockIdx.x;
+    int glob_y = 1 + threadIdx.y + blockDim.y * blockIdx.y;
+    
+    int tid_x = threadIdx.x;
+    int tid_y = threadIdx.y;
+    
+    //threads load values into smem,
+    int global_idx = glob_y * width + glob_x;
+    tile[threadIdx.y][threadIdx.x] = pressure_prev[global_idx];
+
+    __syncthreads();
+    //LEAVING UNFINISHED TO FOCUS ON PARTICLE FUNCTIONS
+
+    //one thread per cell, boundary check
+    std::size_t index = blockIdx.x * blockDim.x + threadIdx.x;
+    if(index >= m_width * m_height) return;
+    std::size_t x = index % m_width;
+    std::size_t y = index / m_width;
+    if(y == 0 || y >= m_height - 1 || x == 0 || x >= m_width - 1) return;
+
+
+
+    float xl = m_pressure_prev[index - 1];
+    float xr = m_pressure_prev[index + 1];
+    float yt = m_pressure_prev[index - m_width];
+    float yb = m_pressure_prev[index + m_width];
+
+    float pressure = (xl + xr + yt + yb - m_divergence[index]) * 0.25f;
+
+    m_pressure[index] = pressure;
+}
 
 __global__ void project_kernel(const float *m_pressure, float *m_u_velocity, float *m_v_velocity,
                                std::size_t m_width, std::size_t m_height) {
@@ -508,17 +550,26 @@ void CUDA_simulation::scalar_boundaries(float *field) {
 
 
 void CUDA_simulation::project_step_tiled() {
+
+    //tiled version of our pressure solver
     FluidGrid &fluid = env_.fluid_grid;
     std::size_t width = env_.m_width;
     std::size_t height = env_.m_height;
-    int threads = 256;
-    int blocks = (width * height + threads - 1) / threads;
+
+    //16 by 16 threads per block
+    dim3 threads(16,16);
+    //boundary cells are processed seperately so width and height -2
+    dim3 blocks(
+        (width-2 + threads.x-1)/threads.x,
+        (height-2 + threads.y-1)/threads.y
+    )
+
     divergence_kernel<<<blocks, threads>>>(d_u_, d_v_, d_divergence_, width, height);
     FLUID_CHECK(cudaGetLastError());
 
     // Preserve the CPU pressure warm start, iteration count and final swap.
     for(std::size_t k = 0; k < fluid.m_pressure_iter; k++) {
-        pressure_kernel<<<blocks, threads>>>(d_pressure_prev_, 
+        pressure_kernel_tiled<<<blocks, threads>>>(d_pressure_prev_, 
                                             d_divergence_, 
                                             d_pressure_, 
                                             width,
