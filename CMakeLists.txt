@@ -37,6 +37,7 @@ add_executable(vehicle_sim
     src/vehicle/DriftDynamics.cpp
     src/vehicle/ProbabilityMap.cpp
     src/vehicle/SearchPlanner.cpp
+    src/ExperimentConfig.cpp
 )
 
 target_link_libraries(vehicle_sim 

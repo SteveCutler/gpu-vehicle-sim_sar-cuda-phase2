@@ -9,6 +9,7 @@
 #include "vehicle/vehicleTypes.hpp"
 #include "vehicle/SearchPlanner.hpp"
 #include "vehicle/DriftItem.hpp"
+#include "ExperimentConfig.hpp"
 
 
 class CUDA_simulation
@@ -67,10 +68,17 @@ public:
     void vel_boundaries();
     void pressure_boundaries();
     void scalar_boundaries(float* field);
-    void project_step();
+ 
+    void project_step_global();
+    void project_step_tiled();
     void add_source(std::size_t x, std::size_t y, float size, Vec3 clr);
     void diffuse(float dt, const float* source, float*& destination);
     void advect_decay(float dt, const float* source, float* dest);
+
+    //experiment config
+    void setConfig(const ExperimentConfig& config) {
+    config_ = config;
+}
   
 
     //init objects
@@ -147,5 +155,8 @@ private:
     std::size_t v_count_;
     float dt_;
     std::size_t cell_size_;
+
+    //config
+    ExperimentConfig config_;
 
 };

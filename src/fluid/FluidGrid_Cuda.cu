@@ -506,13 +506,46 @@ void CUDA_simulation::scalar_boundaries(float *field) {
     FLUID_CHECK(cudaGetLastError());
 }
 
-void CUDA_simulation::project_step() {
+
+void CUDA_simulation::project_step_tiled() {
     FluidGrid &fluid = env_.fluid_grid;
     std::size_t width = env_.m_width;
     std::size_t height = env_.m_height;
     int threads = 256;
     int blocks = (width * height + threads - 1) / threads;
     divergence_kernel<<<blocks, threads>>>(d_u_, d_v_, d_divergence_, width, height);
+    FLUID_CHECK(cudaGetLastError());
+
+    // Preserve the CPU pressure warm start, iteration count and final swap.
+    for(std::size_t k = 0; k < fluid.m_pressure_iter; k++) {
+        pressure_kernel<<<blocks, threads>>>(d_pressure_prev_, 
+                                            d_divergence_, 
+                                            d_pressure_, 
+                                            width,
+                                            height);
+        FLUID_CHECK(cudaGetLastError());
+        pressure_boundaries();
+        std::swap(d_pressure_, d_pressure_prev_);
+    }
+    std::swap(d_pressure_, d_pressure_prev_);
+    pressure_boundaries();
+
+    project_kernel<<<blocks, threads>>>(d_pressure_, d_u_, d_v_, width, height);
+    FLUID_CHECK(cudaGetLastError());
+    vel_boundaries();
+}
+
+void CUDA_simulation::project_step_global() {
+    FluidGrid &fluid = env_.fluid_grid;
+    std::size_t width = env_.m_width;
+    std::size_t height = env_.m_height;
+    int threads = 256;
+    int blocks = (width * height + threads - 1) / threads;
+    divergence_kernel<<<blocks, threads>>>(d_u_, 
+                                            d_v_, 
+                                            d_divergence_, 
+                                            width, 
+                                            height);
     FLUID_CHECK(cudaGetLastError());
 
     // Preserve the CPU pressure warm start, iteration count and final swap.
@@ -593,7 +626,11 @@ void CUDA_simulation::step_fluid(float dt) {
     diffuse_vel(dt);
     vel_boundaries();
 
-    project_step();
+    if (config_.pressure == PressureMode::Tiled) {
+        project_step_tiled();
+    } else {
+        project_step_global();
+    }
 
     for(auto &emitter : fluid.m_emitters) {
         add_source(emitter->m_pos.x, emitter->m_pos.y, emitter->m_rad, emitter->m_clr);

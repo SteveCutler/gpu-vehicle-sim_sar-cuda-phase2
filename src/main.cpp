@@ -148,10 +148,16 @@ int main(int argNum, char* argVals[]){
     #endif
 
     #ifdef ENABLE_CUDA
+    
         CUDA_simulation CudaSim(planner, target, p_map, tempMap, env, N, dt, cell_size);
-        if(useCuda){
-            CudaSim.init_simulation(vehicles);
+
+        //config file setter for experimentation
+        if (argc > 4) {
+            CudaSim.setConfig(loadExperimentConfig(argv[4]));
         }
+
+        CudaSim.init_simulation(vehicles);
+        
     #endif
 
 
