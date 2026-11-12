@@ -50,12 +50,15 @@ public:
     void find_waypoints();
     void calc_occ_maps(std::size_t steps, std::size_t p_count);
     void calc_paths(vehicleBatch& vehicles, std::size_t steps, std::size_t p_count);
+    void path_hits();
     void score_paths(vehicleBatch& vehicles);
     std::pair<float,float> convert_cell(std::size_t cell);
     void update_particles();
     void particle_cull_atomic();
     void particle_cull_prefix();
     void compute_prob_cuda();
+    void path_hits_packed();
+    void score_paths_packed();
 
     void step_fluid(float dt);
     void HtD_fluid();
@@ -110,12 +113,12 @@ private:
     float* vs_goalx = nullptr;
     float* vs_goaly = nullptr;
     float sensor_radius_ = 0;
-
+    
     //FLUID POINTER VARS
     // Noise used to generate the velocity disturbance
     float* d_noise_ = nullptr;
     float elapsed_dt = 0.f;
-
+    
     // density
     float* d_density_r_ = nullptr;
     float* d_density_g_ = nullptr;
@@ -123,21 +126,23 @@ private:
     float* d_density_r_prev_ = nullptr;
     float* d_density_g_prev_ = nullptr;
     float* d_density_b_prev_ = nullptr;
-
+    
     // Projection
     float* d_divergence_ = nullptr;
     float* d_pressure_ = nullptr;
     float* d_pressure_prev_ = nullptr;
     float* d_diffusion_scratch_ = nullptr;
-
+    
     float* d_u_ = nullptr;
     float* d_v_ = nullptr;
     float* d_u_prev_ = nullptr;
     float* d_v_prev_ = nullptr;
-
+    
     //WAYPOINT DEVICES
     float* d_waypoints_x = nullptr;
     float* d_waypoints_y = nullptr;
+    float* d_vehicle_paths_x = nullptr;
+    float* d_vehicle_paths_y = nullptr;
     unsigned int* d_occupancy_map = nullptr;
     unsigned int* d_occupancy_maps_ = nullptr;
     std::vector<unsigned int> occupancy_maps_;
