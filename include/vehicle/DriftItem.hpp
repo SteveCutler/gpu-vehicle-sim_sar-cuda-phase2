@@ -1,6 +1,4 @@
 #pragma once
-#include <iostream>
-#include <vector>
 #include <cstddef>
 
 struct DriftItem{
@@ -24,6 +22,10 @@ struct PredictionParticle{
     float weight;
     float life_;
 
+    PredictionParticle()
+    : ID(0), pos{}, weight(0.f), life_(1.f)
+    {}
+
     PredictionParticle(std::size_t id){
         ID = id;
         pos.x = 0.f;
@@ -37,6 +39,7 @@ struct PredictionParticle{
         pos.x = x_pos;
         pos.y = y_pos;
         weight = 0.f;
+        life_ = 1.f;
     }
 
     PredictionParticle(std::size_t id, float x_pos, float y_pos, float life){
