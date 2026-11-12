@@ -1,4 +1,7 @@
 #pragma once
+#include <iostream>
+#include <vector>
+#include <cstddef>
 
 struct DriftItem{
     float x;
