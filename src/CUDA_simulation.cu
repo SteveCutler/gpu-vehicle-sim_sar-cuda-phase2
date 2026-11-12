@@ -870,11 +870,89 @@ __global__ void p_cull_prefixlocal_kernel_smem(
 }
 
 
-__global__ void prefix(
-    unsigned int* nums;
+__global__ void prefix_kernel(
+    unsigned int* nums,
+    std::size_t block_total,
+    unsigned int* remainder
 ){
 
+    std::size_t idx = threadIdx.x;
+
+    unsigned int = idx < block_total ? nums[idx] : 0u;
+
+    __syncthreads();
+    //blelloch upsweep
+
+    offset = 1;
+    int a_i;
+    int b_i;
+    for(int x = nums/2; x > 0; x/=2){
+
+        if(idx < x){
+
+            a_i = offset * (2 * idx + 1) -1;
+            b_i = offset * (2 * idx + 2) -1;
+    
+            nums[b_i] += nums[a_i];
+        }
+        offset *=2;
+        __syncthreads();
+
+    }
+
+    if(idx == 0){
+        //write out total
+        *remainder = nums[blockDim.x-1];
+        nums[blockDim.x-1] = 0;
+    }
+    __syncthreads();
+
+    //downsweep
+    offset /= 2;
+    unsigned int temp;
+    for(int x = 1; x < blockDim.x; x*=2;){
+
+        if(idx < x){
+
+            a_i = offset * (2 * idx + 1) -1;
+            b_i = offset * (2 * idx + 2) -1;
+
+            temp = nums[a_i];
+    
+            nums[a_i] = nums[b_i];
+            nums[b_i] += temp;
+        }
+
+        offset/=2;
+        __syncthreads();
+    }
+
+
 }
+
+__global__ void p_cull_sum_scatter(
+    const PredictionParticle* particles,
+    PredictionParticle* particlebuffer,
+    const unsigned char* remove_map,
+    unsigned int* dead_prefix,
+    const unsigned int* local_totals,
+    const std::size_t p_count
+){
+
+    std::size_t idx = threadIdx.x + blockDim.x*blockIdx.x;
+
+    if(idx >= p_count){
+        return;
+    }
+    
+    PredictionParticle p = particles[idx];
+
+    if(remove_map[idx] == 0){
+        particlebuffer[idx - local_totals[blockIdx.x] - dead_prefix[idx]] = p;
+    }
+
+}
+
 void CUDA_simulation::init_simulation( 
     vehicleBatch& vehicles){
         
@@ -961,6 +1039,29 @@ void CUDA_simulation::init_simulation(
         //calc number of cells
         //allocate space for hit maps for path calculations
         CUDA_CHECK(cudaMalloc(&this->d_hit_map, hit_bytes));
+
+
+        //particle scan mallocs
+        const std::size_t scan_threads = 256;
+        const std::size_t max_blocks =
+            (p_count + scan_threads - 1) / scan_threads;
+
+        std::size_t max_prefix_threads = 1;
+        while (max_prefix_threads < max_blocks) {
+            max_prefix_threads *= 2;
+        }
+
+        // Padded entries are needed by the global-memory Blelloch kernel.
+        CUDA_CHECK(cudaMalloc(
+            &d_dead_prefix,
+            max_blocks * scan_threads * sizeof(unsigned int)
+        ));
+
+        // Padded entries are needed by the block-totals scan.
+        CUDA_CHECK(cudaMalloc(
+            &d_local_totals,
+            max_prefix_threads * sizeof(unsigned int)
+        ));
 
 
 }
@@ -1407,23 +1508,25 @@ void CUDA_simulation::particle_cull_prefix(){
 
     std::size_t p_count = this->p_map_.particles_.size();
 
-    //multi step operation
+    //////////
     //1. scan blocks, write out totals to SMEM. 
     //Write out local block values to vector, and before exit write out block totals
 
 
     std::size_t threads = 256;
     std::size_t blocks = (p_count + threads - 1)/threads;
+ 
+    //get threads that are multiples of 2
+    std::size_t prefix_threads = 1;
+    while(prefix_threads < blocks){
+        prefix_threads *=2;
+    }
 
     //return for local totals
-    std::vector<unsigned int> local_totals(blocks);
-    CUDA_CHECK(cudaMalloc(&this->d_local_totals, blocks*sizeof(unsigned int)));
-    CUDA_CHECK(cudaMemset(d_local_totals, 0, blocks*sizeof(unsigned int)));
-    
-    CUDA_CHECK(cudaMalloc(&this->d_dead_prefix, blocks*threads*sizeof(unsigned int)));
+    CUDA_CHECK(cudaMemset(d_local_totals, 0, prefix_threads*sizeof(unsigned int)));
     CUDA_CHECK(cudaMemset(d_dead_prefix, 0, blocks*threads*sizeof(unsigned int)));
-
-
+    
+    
     //seperate kernel that removes particles marked as dead
     //baseline impl uses atomic adds
     p_cull_prefixlocal_kernel<<<blocks, threads>>>(
@@ -1431,15 +1534,52 @@ void CUDA_simulation::particle_cull_prefix(){
         this->d_local_totals,
         this->d_dead_prefix,
         p_count
-        );
+    );
+    CUDA_CHECK(cudaGetLastError());
+    
+    ///////////////
+    //2 inclusive sum block totals, write out total remove particles
+    //save final amount so we know how many particles will be left after to resize new vector
+    
+    
+    unsigned int remainder;
+    CUDA_CHECK(cudaMemset(d_remainder, 0, sizeof(unsigned int)));
+
+    prefix_kernel<<<1,prefix_threads>>>(d_local_totals, blocks, d_remainder);
     CUDA_CHECK(cudaGetLastError());
 
-    //2 inclusive prefix sum block totals
-    //save final amount so we know how many particles will be left after to resize new vector
+    cudaMemcpy(&remainder, 
+        d_remainder, 
+        sizeof(unsigned int), 
+        cudaMemcpyDeviceToHost);
 
     //3 apply block totals to local block values, scatter particles in result vector
     //write out vector, resize new vector, swap it with old particle vector
     //
+
+        p_cull_sum_scatter<<<blocks, threads>>>(
+        this->d_particles,
+        this->d_particle_buffer,
+        this->d_remove_particles_,
+        this->d_dead_prefix,
+        this->d_local_totals,
+        p_count
+    );
+    CUDA_CHECK(cudaGetLastError());
+
+    //resize to fit only survivors
+    std::size_t survivors = p_count - remainder;
+    p_map_.particles_.resize(survivors);
+
+    //copy survivors
+    CUDA_CHECK(cudaMemcpy(p_map_.particles_.data(),
+    d_particle_buffer,
+    survivors * sizeof(PredictionParticle),
+    cudaMemcpyDeviceToHost
+    ));
+
+    std::swap(d_particles, d_particle_buffer);
+
 
 };
 
@@ -1476,12 +1616,55 @@ void CUDA_simulation::particle_cull_prefix_smem(){
         );
     CUDA_CHECK(cudaGetLastError());
 
-    //2 inclusive prefix sum block totals
+    ///////////////
+    //2 inclusive sum block totals, write out total remove particles
     //save final amount so we know how many particles will be left after to resize new vector
+    
+    
+    //get threads that are multiples of 2
+    std::size_t prefix_threads = 1;
+    while(prefix_threads < blocks){
+        prefix_threads *=2;
+    }
+    CUDA_CHECK(cudaMalloc(&this->d_local_totals, prefix_threads*sizeof(unsigned int)));
+
+    unsigned int remainder;
+    CUDA_CHECK(cudaMemset(d_remainder, 0, sizeof(unsigned int)));
+
+    prefix_kernel<<<1,prefix_threads>>>(d_local_totals, blocks, d_remainder);
+    CUDA_CHECK(cudaGetLastError());
+
+    cudaMemcpy(&remainder, 
+        d_remainder, 
+        sizeof(unsigned int), 
+        cudaMemcpyDeviceToHost);
 
     //3 apply block totals to local block values, scatter particles in result vector
     //write out vector, resize new vector, swap it with old particle vector
     //
+
+        p_cull_sum_scatter<<<blocks, threads>>>(
+        this->d_particles,
+        this->d_particle_buffer,
+        this->d_remove_particles_,
+        this->d_dead_prefix,
+        this->d_local_totals,
+        p_count
+    );
+    CUDA_CHECK(cudaGetLastError());
+
+    //resize to fit only survivors
+    std::size_t survivors = p_count - remainder;
+    p_map_.particles_.resize(survivors);
+
+    //copy survivors
+    CUDA_CHECK(cudaMemcpy(p_map_.particles_.data(),
+    d_particle_buffer,
+    survivors * sizeof(PredictionParticle),
+    cudaMemcpyDeviceToHost
+    ));
+
+    std::swap(d_particles, d_particle_buffer);
 
 };
 
@@ -1510,8 +1693,20 @@ void CUDA_simulation::update_particles(){
         this->env_.m_height);
     CUDA_CHECK(cudaGetLastError());
 
-        
-    particle_cull_atomic();
+    
+switch (config_.compaction) {
+    case CompactionMode::Atomic:
+        particle_cull_atomic();
+        break;
+
+    case CompactionMode::PrefixGlobal:
+        particle_cull_prefix();
+        break;
+
+    case CompactionMode::PrefixShared:
+        particle_cull_prefix_smem();
+        break;
+}
     
 };
 
@@ -1693,6 +1888,8 @@ CUDA_simulation::~CUDA_simulation(){
     cudaFree(d_remove_particles_);    
     cudaFree(d_p_horizons);
     cudaFree(d_hit_map);
+    cudaFree(d_local_totals);
+    cudaFree(d_dead_prefix;)
     cudaFree(d_occupancy_maps_);
     cudaFree(d_occupancy_map);
     cudaFree(d_waypoints_x);
