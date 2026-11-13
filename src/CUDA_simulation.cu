@@ -564,7 +564,6 @@ __global__ void hit_kernel(
 
             unsigned char hit = 0;
 
-            // Step 0 is the current position; match the old kernel's 1...steps.
             for (std::size_t s = 1; s <= steps; ++s) {
                 const PredictionParticle& p =
                     d_p_horizons[s * p_count + idx];
@@ -586,6 +585,64 @@ __global__ void hit_kernel(
             }
 
             d_hit_map[hit_idx] = hit;
+        }
+    }
+}
+__global__ void packed_hit_kernel(
+    const float* d_vehicle_paths_x,
+    const float* d_vehicle_paths_y,
+    const PredictionParticle* d_p_horizons,
+    unsigned int* d_packed_hits,
+    std::size_t p_count,
+    std::size_t wp_num,
+    std::size_t v_count,
+    std::size_t steps,
+    std::size_t height,
+    float sensor_rad
+) {
+    //no boundary check because we need all warpthreads
+    std::size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    std::size_t words_per_path = (p_count + 31) / 32;
+    std::size_t word_idx = idx / 32;
+    std::size_T lane = threadIdx.x % 32;
+
+    unsigned int FULL_MASK = 0xFFFFFFFF;
+
+    // each thread checks its particle against every candidate path
+    for (std::size_t v = 0; v < v_count; ++v) {
+        for (std::size_t wp = 0; wp < wp_num; ++wp) {
+            std::size_t path_idx = v * wp_num + wp;
+            std::size_t path_start = path_idx * (steps + 1);
+            std::size_t hit_idx = path_idx * p_count + idx;
+
+            unsigned int hit = 0;
+
+            if(idx < p_count){
+
+                for (std::size_t s = 1; s <= steps; ++s) {
+                    const PredictionParticle& p = d_p_horizons[s * p_count + idx];
+
+    
+                    if (scan_helper(
+                        p.pos.x,
+                        static_cast<float>(height) - p.pos.y,
+                        d_vehicle_paths_x[path_start + s],
+                        d_vehicle_paths_y[path_start + s],
+                        sensor_rad
+                    )) {
+                        //exit and count this particle only once per path
+                        hit = 1;
+                        break; 
+                    }
+                }
+
+            }
+
+            unsigned int warp_hits = __ballot_sync(FULL_MASK, hit != 0);
+
+            if (lane == 0 && idx < p_count) {
+                d_packed_hits[path_idx * words_per_path + word_idx] = warp_hits;
+            }
         }
     }
 }
@@ -656,6 +713,92 @@ __global__ void score_paths_kernel(
         if(warp_num == 0){
             //if lane in bounds for smem, load value, else get 0
             unsigned int warp_total = lane_num < smem_num ? sMem[lane_num] : 0;
+            
+            offset = 1;
+            while(offset < 32){
+                warp_total += __shfl_down_sync(FULL_MASK, warp_total, offset);
+                offset *=2;
+            }
+            
+            if(lane_num == 0){
+                if(warp_total > hit_tally){
+                    best_wp = wp;
+                    hit_tally = warp_total;
+                }
+            }
+        }
+        __syncthreads();
+        
+    }
+
+    //afterwards tid 0 writes out best_wp to 
+    if(idx == 0){
+
+        best_wps[v_num] = best_wp;
+    }
+
+}
+
+__global__ void score_paths_packed_kernel(
+    const unsigned int* packed_hits,
+    const std::size_t wp_num,
+    const std::size_t v_count,
+    const std::size_t p_count,
+    unsigned int* best_wps,
+    const std::size_t warp_count
+){
+
+    extern __shared__ unsigned int sMem[];
+
+    
+    //first loop just fills in the smem, other loops compare
+    std::size_t idx = threadIdx.x;
+    std::size_t words_per_path(p_count + 31) / 32
+    
+    //each block has 256 threads and is used to calculate all rollouts for one vehicle
+    //
+    
+    if(blockIdx.x >= v_count){
+        return;
+    }
+    unsigned int hit_tally = 0;
+    unsigned int best_wp = 0;
+    
+    int warp_num = idx / 32;
+    int lane_num = idx % 32;
+    
+    int v = blockIdx.x;
+   
+    std::size_t hit_offset;
+
+    //warp packed hits coming in
+    //each path can be evaluated
+    
+    //loop over all wp for current vehicle
+    for(int wp = 0; wp < wp_num; wp++){
+        unsigned int local_hits = 0;
+        //calculate hit_offset, vehicle * waypoints * particle counts to access correct hit_num data
+        hit_offset = (v * wp_num + wp) * words_per_path;
+
+        //within current wp, threads only go up to p_coun
+
+        for(std::size_t word = idx; word < words_per_path; word += blockDim.x){
+    
+    
+            //load hit data
+            local_hits += __popc(packed_hits[word+hit_offset]);
+            
+        }        
+        
+        if(lane_num == 0){
+            sMem[warp_num] = local_hits;
+        }
+        __syncthreads();
+        
+        //thread 1 reduces sMemresults and stores in register value
+        if(warp_num == 0){
+            //if lane in bounds for smem, load value, else get 0
+            unsigned int warp_total = lane_num < warp_count ? sMem[lane_num] : 0;
             
             offset = 1;
             while(offset < 32){
@@ -1106,6 +1249,13 @@ void CUDA_simulation::init_simulation(
             max_prefix_threads * sizeof(unsigned int)
         ));
 
+        //packed hit config
+        std::size_t words_per_path = (particle_capacity_ + 31) / 32;
+        std::size_t path_count = v_count_ * candidate_waypoints_;
+        std::size_t packed_bytes = path_count * words_per_path * sizeof(unsigned int);
+
+        CUDA_CHECK(cudaMalloc(&d_packed_hits_, packed_bytes));
+
 
 }
 
@@ -1497,11 +1647,11 @@ void CUDA_simulation::path_hits_packed(){
     std::size_t threads = 256;
     std::size_t blocks = (p_count + threads - 1)/threads;
 
-    hit_kernel<<<blocks, threads>>>(
+    packed_hit_kernel<<<blocks, threads>>>(
         this->d_vehicle_paths_x,
         this->d_vehicle_paths_y,
         this->d_p_horizons,
-        this->d_hit_map,
+        this->d_packed_hits,
         p_count,
         this->candidate_waypoints_,
         this->v_count,
@@ -1580,12 +1730,12 @@ void CUDA_simulation::score_paths_packed(vehicleBatch& vehicles){
 
     //smem is threads / warp size
     std::size_t warp_count = threads / 32;
-    //8 unsigned-int warp totals: 32 bytes per block
+    //8
     std::size_t smem_bytes = warp_count * sizeof(unsigned int);
 
     //pass in d_hit_num
-    score_paths_kernel<<<blocks, threads, smem_bytes>>>(
-        this->d_hit_map, 
+    score_paths_packed_kernel<<<blocks, threads, smem_bytes>>>(
+        this->d_packed_hits, 
         this->candidate_waypoints_,
         this->v_count_,
         p_count,
@@ -1614,6 +1764,8 @@ void CUDA_simulation::score_paths_packed(vehicleBatch& vehicles){
 
 };
 
+
+
 void CUDA_simulation::particle_cull_atomic(){
     //variable to receive remaining particle count
     std::size_t p_count = this->p_map_.particles_.size();
@@ -1623,7 +1775,7 @@ void CUDA_simulation::particle_cull_atomic(){
     std::size_t threads = 256;
     std::size_t blocks = (p_count + threads - 1)/threads;
         
-    //seperate kernel that removes particles marked as dead
+    //separate kernel that removes particles marked as dead
     //baseline impl uses atomic adds
     particle_cull_atomic_kernel<<<blocks, threads>>>(
         this->d_particles_,
