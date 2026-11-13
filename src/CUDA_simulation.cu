@@ -825,6 +825,108 @@ __global__ void score_paths_packed_kernel(
 
 }
 
+__global__ void hit_score_fused_kernel(
+    const float* d_vehicle_paths_x,
+    const float* d_vehicle_paths_y,
+    const PredictionParticle* d_p_horizons,
+    std::size_t p_count,
+    std::size_t wp_count,
+    std::size_t v_count,
+    unsigned int* path_scores,
+    std::size_t steps,
+    std::size_t height,
+    float sensor_rad
+){
+
+    //HIT CALC SECTION
+    //1 block per path, caculates hits and writes them out to smem, 
+    //first warp reduces and writes path sum to total path sized vector
+
+    //warp number of shared bytes
+    extern __shared__ unsigned int sMem[];
+
+
+    //vehicle offset
+    std::size_t tid = threadIdx.x;
+    std::size_t path_idx = blockIdx.x;
+
+    std::size_t lane = threadIdx.x % 32;
+    std::size_t warp = threadIdx.x / 32;
+    unsigned int warp_total = 0;
+
+    unsigned int FULL_MASK = 0xFFFFFFFF;
+
+    // each thread checks its particle against every candidate path
+
+    std::size_t path_start = path_idx * (steps + 1);
+
+    
+    for(std::size_t base = 0; base < p_count; base += blockDim.x){
+        //reset hit for new particle
+        
+        unsigned int hit = 0;
+        std::size_t p_idx = base + tid;
+
+        if(p_idx < p_count){
+
+            for (std::size_t s = 1; s <= steps; ++s) {
+                const PredictionParticle& p = d_p_horizons[p_idx + s * p_count];
+
+
+                if (scan_helper(
+                    p.pos.x,
+                    static_cast<float>(height) - p.pos.y,
+                    d_vehicle_paths_x[path_start + s],
+                    d_vehicle_paths_y[path_start + s],
+                    sensor_rad
+                )) {
+                    //exit and count this particle only once per path
+                    hit = 1;
+                    break; 
+                }
+            }
+
+        }
+
+        unsigned int warp_hits = __popc(__ballot_sync(FULL_MASK, hit != 0));
+
+        if (lane == 0) {
+            warp_total += warp_hits;
+        }
+    }
+
+    //SCORE BLOCKS
+
+    if(lane == 0){
+        sMem[warp] = warp_total;
+    }
+    __syncthreads();
+    //
+    if(warp == 0){
+        //load tallys
+        if( lane < blockDim.x/32){
+            warp_total = sMem[lane];
+        }
+        else{
+            //load 0 if out of range
+            warp_total = 0u;
+        }
+
+        
+        //reduce total down to first lane
+        std::size_t offset = 1;
+        while(offset < 32){
+            warp_total += __shfl_down_sync(FULL_MASK, warp_total, offset);
+            offset *=2;
+        }
+
+        //save out block local total
+        if(tid == 0){
+            path_scores[path_idx] = warp_total;
+        }
+    }
+
+}
 
 __global__ void particle_update_kernel(
     PredictionParticle* particles,
@@ -1215,6 +1317,8 @@ void CUDA_simulation::init_simulation(
         CUDA_CHECK(cudaMalloc(&this->d_waypoints_x, (this->candidate_waypoints_-1)*sizeof(float)));
         CUDA_CHECK(cudaMalloc(&this->d_waypoints_y, (this->candidate_waypoints_-1)*sizeof(float)));
         CUDA_CHECK(cudaMalloc(&this->d_best_wp, (this->v_count_ * sizeof(unsigned int))));
+        path_scores.resize(v_count_ * candidate_waypoints_);
+        CUDA_CHECK(cudaMalloc(&this->d_path_scores, this->candidate_waypoints_ * this->v_count_ * sizeof(unsigned int)));
 
         //occupancy maps -> -1 because the first waypoint candidate is the current one
         this->cell_count_ = (env_.m_width / cell_size_) * (env_.m_height / cell_size_);
@@ -1720,8 +1824,7 @@ void CUDA_simulation::score_paths_packed(vehicleBatch& vehicles){
     //one block for every vehicle, loops over all waypoint rollouts and calculates hit totals
     std::size_t p_count = p_map_.particles_.size();
     //hit total return vectors
-    std::size_t paths = this->v_count_;
-    std::vector<unsigned int> best_wps(paths);
+    std::vector<unsigned int> best_wps(this->v_count_);
 
 
 
@@ -1747,7 +1850,7 @@ void CUDA_simulation::score_paths_packed(vehicleBatch& vehicles){
 
     CUDA_CHECK(cudaMemcpy(best_wps.data(),
     d_best_wp, 
-    paths * sizeof(unsigned int), 
+    this->v_count_ * sizeof(unsigned int), 
     cudaMemcpyDeviceToHost));
 
     //loop over results and assign waypoints to the vehicles
@@ -1764,7 +1867,85 @@ void CUDA_simulation::score_paths_packed(vehicleBatch& vehicles){
 
 };
 
+void CUDA_simulation::hit_score_fused(vehicleBatch& vehicles){
 
+    //fused kernel
+
+    std::size_t p_count = this->p_map_.particles_.size();
+    std::size_t steps = this->planner_.horizon_;
+
+
+    std::size_t threads = 256;
+    //one block per path rollout
+    int blocks = this->v_count_ * this->candidate_waypoints_;
+
+    //calc number of warps for smem reduction
+    unsigned int shared_bytes = (threads / 32) * sizeof(unsigned int);
+
+    hit_score_fused_kernel<<<blocks, threads, shared_bytes>>>(
+        this->d_vehicle_paths_x,
+        this->d_vehicle_paths_y,
+        this->d_p_horizons,
+        p_count,
+        this->candidate_waypoints_,
+        this->v_count_,
+        this->d_path_scores,
+        steps,
+        this->env_.m_height,
+        this->sensor_radius_
+    );
+
+    CUDA_CHECK(cudaGetLastError());
+
+    //path totals are in d_path_scores
+    CUDA_CHECK(cudaMemcpy(
+        this->path_scores.data(),
+        d_path_scores,
+        blocks*sizeof(unsigned int),
+        cudaMemcpyDeviceToHost));
+
+        //loop over every vehicle path count,
+        for(int v = 0; v<v_count_; v++){
+            //result max and winner per vehicle
+            std::size_t max = 0;
+            std::size_t winner = 0;
+
+            for (int wp = 0; wp < candidate_waypoints_; ++wp) {
+                //find winning path
+                if(path_scores[v * candidate_waypoints_ + wp] > max){
+                    max = path_scores[v * candidate_waypoints_ + wp];
+                    winner = wp;
+                }
+
+            }
+
+            //assign winning waypoint to vehicle
+            if (winner != 0) {
+                VehicleState state = vehicles.load(v);
+                state.goalx = planner_.wayPoints[winner].first;
+                state.goaly = planner_.wayPoints[winner].second;
+                vehicles.set(v, state);
+            }
+        }
+
+        //sync vehicle goals up to GPU
+        CUDA_CHECK(cudaMemcpy(
+            this->vs_goalx,
+            vehicles.m_goalx,
+            v_count_ * sizeof(unsigned int),
+            cudaMemcpyHostToDevice
+        ));
+        
+        CUDA_CHECK(cudaMemcpy(
+            this->vs_goaly,
+            vehicles.m_goaly,
+            v_count_ * sizeof(unsigned int),
+            cudaMemcpyHostToDevice
+        ));
+
+
+
+};
 
 void CUDA_simulation::particle_cull_atomic(){
     //variable to receive remaining particle count
@@ -2116,16 +2297,20 @@ std::size_t CUDA_simulation::runCudaSimulation(
                 this->p_map_.particles_.size()
             );
 
-            if (config_.packed_hits) {
-                path_hits_packed();
-
-                score_paths_packed(vehicles);
-
-            }else{
-
+            switch (config_.hit_mode) {
+            case HitMode::Byte:
                 path_hits();
-    
                 score_paths(vehicles);
+                break;
+
+            case HitMode::Packed:
+                path_hits_packed();
+                score_paths_packed(vehicles);
+                break;
+
+            case HitMode::Fused:
+                hit_score_fused(vehicles); 
+                break;
             }
 
         }

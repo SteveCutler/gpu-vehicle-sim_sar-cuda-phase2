@@ -58,7 +58,8 @@ public:
     void particle_cull_prefix();
     void compute_prob_cuda();
     void path_hits_packed();
-    void score_paths_packed();
+    void score_paths_packed(vehicleBatch& vehicles);
+    void hit_score_fused(vehicleBatch& vehicles);
 
     void step_fluid(float dt);
     void HtD_fluid();
@@ -148,6 +149,7 @@ private:
     std::vector<unsigned int> occupancy_maps_;
     std::size_t candidate_waypoints_ = 3;
     unsigned int* d_best_wp = nullptr;
+    unsigned int* d_path_scores = nullptr;
 
     //PARTICLE POINTER VARS
     PredictionParticle* d_particles_ = nullptr;
@@ -159,6 +161,7 @@ private:
     std::vector<PredictionParticle> horizons_;
     unsigned char* d_hit_map = nullptr;
     unsigned int* d_local_totals = nullptr;
+    unsigned int* d_packed_hits = nullptr;
 
     std::size_t cell_count_;
     std::size_t v_count_;
