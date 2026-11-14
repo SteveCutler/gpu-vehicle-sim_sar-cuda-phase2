@@ -183,8 +183,11 @@ __global__ void divergence_kernel(const float *m_u_velocity, const float *m_v_ve
     m_divergence[index] = div;
 }
 
-__global__ void pressure_kernel(const float *m_pressure_prev, const float *m_divergence,
-                                float *m_pressure, std::size_t m_width, std::size_t m_height) {
+__global__ void pressure_kernel(const float *m_pressure_prev, 
+                                const float *m_divergence,
+                                float *m_pressure, 
+                                std::size_t m_width, 
+                                std::size_t m_height) {
     // One thread per grid cell.
     std::size_t index = blockIdx.x * blockDim.x + threadIdx.x;
     if(index >= m_width * m_height) return;
@@ -201,6 +204,7 @@ __global__ void pressure_kernel(const float *m_pressure_prev, const float *m_div
 
     m_pressure[index] = pressure;
 }
+
 __global__ void pressure_kernel_tiled(
     const float* pressure_prev, 
     const float* divergence,
@@ -209,40 +213,211 @@ __global__ void pressure_kernel_tiled(
     std::size_t height) {
 
     // shared memory tile def, 1 halo cell on each side so +2 per dimension
-    __shared__ float tile[18][18];
+    extern __shared__ float tile[];
     
-    //calc index
-    int glob_x = 1 + threadIdx.x + blockDim.x * blockIdx.x;
-    int glob_y = 1 + threadIdx.y + blockDim.y * blockIdx.y;
+    // offsets
+    std::size_t glob_offset_x = blockDim.x * blockIdx.x;
+    std::size_t glob_offset_y = blockDim.y * blockIdx.y;
+
+    //tile sizing
+    std::size_t tile_cols = blockDim.x + 2;
+    std::size_t tile_rows = blockDim.y + 2;
     
     int tid_x = threadIdx.x;
     int tid_y = threadIdx.y;
-    
-    //threads load values into smem,
-    int global_idx = glob_y * width + glob_x;
-    tile[threadIdx.y][threadIdx.x] = pressure_prev[global_idx];
+
+    //Nested loop, raking threads over tile dimensions
+    //Write the values to the tile
+    //some threads do 2 loads from global memory and we load corners
+
+    //y major loop
+    for(int y = tid_y; y < tile_rows; y += blockDim.y){
+        for(int x = tid_x; x < tile_cols; x += blockDim.x){
+
+            std::size_t glob_y = y + glob_offset_y;
+            std::size_t glob_x = x + glob_offset_x;
+
+            //save 0 outside
+            if(glob_y < height && glob_x < width){
+                tile[y * tile_cols + x] = pressure_prev[glob_y * width + glob_x];
+            }else{
+                tile[y * tile_cols + x] = 0.f;
+            }
+
+        }
+    }
 
     __syncthreads();
-    //LEAVING UNFINISHED TO FOCUS ON PARTICLE FUNCTIONS
 
-    //one thread per cell, boundary check
-    std::size_t index = blockIdx.x * blockDim.x + threadIdx.x;
-    if(index >= m_width * m_height) return;
-    std::size_t x = index % m_width;
-    std::size_t y = index / m_width;
-    if(y == 0 || y >= m_height - 1 || x == 0 || x >= m_width - 1) return;
+    //PRESSURE SOLVE
 
+    std::size_t g_x = glob_offset_x + tid_x + 1;
+    std::size_t g_y = glob_offset_y + tid_y + 1;
 
+    if (g_x >= width - 1 || g_y >= height - 1) return;
 
-    float xl = m_pressure_prev[index - 1];
-    float xr = m_pressure_prev[index + 1];
-    float yt = m_pressure_prev[index - m_width];
-    float yb = m_pressure_prev[index + m_width];
+    std::size_t index = g_y * width + g_x;
+    std::size_t center_x = tid_x + 1;
+    std::size_t center_y = tid_y + 1;
 
-    float pressure = (xl + xr + yt + yb - m_divergence[index]) * 0.25f;
+    float xl = tile[center_y * tile_cols + center_x - 1];
+    float xr = tile[center_y * tile_cols + center_x + 1];
+    float yt = tile[(center_y - 1) * tile_cols + center_x];
+    float yb = tile[(center_y + 1) * tile_cols + center_x];
 
-    m_pressure[index] = pressure;
+    pressure[index] = (xl + xr + yt + yb - divergence[index]) * 0.25f;
+
 }
+
+__global__ void pressure_kernel_temporal(
+    const float* pressure_prev, 
+    const float* divergence,
+    float* pressure, 
+    std::size_t width, 
+    std::size_t height) {
+
+    // two iteration temporal blocking requires 2 shared memory tiles
+    // made same size to simplify coordinate calculations - although this is a slight waste
+    __shared__ float large_tile[20][20];
+    __shared__ float small_tile[20][20];
+    
+    // offsets
+    int glob_offset_x = blockDim.x * blockIdx.x;
+    int glob_offset_y = blockDim.y * blockIdx.y;
+
+    //tile sizing
+    std::size_t large_tile_cols = blockDim.x + 4;
+    std::size_t large_tile_rows = blockDim.y + 4;
+    std::size_t small_tile_cols = blockDim.x + 2;
+    std::size_t small_tile_rows = blockDim.y + 2;
+    
+    int tid_x = threadIdx.x;
+    int tid_y = threadIdx.y;
+
+    //LOAD LARGE TILE
+    //Nested loop, raking threads over tile dimensions
+    //Write the values to the tile
+    //some threads do 2 loads from global memory and we load corners
+
+    //y major loop
+    for(int y = tid_y; y < large_tile_rows; y += blockDim.y){
+        for(int x = tid_x; x < large_tile_cols; x += blockDim.x){
+
+            int glob_y = y + glob_offset_y - 1;
+            int glob_x = x + glob_offset_x - 1;
+
+            //save 0 outside
+            if(glob_y < height && glob_x < width
+            && glob_y >= 0 && glob_x >= 0){
+                large_tile[y][x] = pressure_prev[glob_y * width + glob_x];
+            }else{
+                large_tile[y][x] = 0.f;
+            }
+
+        }
+    }
+
+    __syncthreads();
+
+    //PRESSURE SOLVE SMALL TILE LOOP
+
+    for(int y = tid_y + 1; y <= small_tile_rows; y += blockDim.y){
+        for(int x = tid_x + 1; x <= small_tile_cols; x += blockDim.x){
+            
+            int glob_y = y + glob_offset_y - 1;
+            int glob_x = x + glob_offset_x - 1;
+            
+            //OOB check
+            if (glob_x < width - 1 && glob_y < height - 1 &&
+            glob_x > 0 && glob_y > 0){
+            
+            std::size_t index = glob_y * width + glob_x;
+
+            float xl = large_tile[y][x - 1];
+            float xr = large_tile[y][x + 1];
+            float yt = large_tile[(y - 1)][x];
+            float yb = large_tile[(y + 1)][x];
+
+            small_tile[y][x] = (xl + xr + yt + yb - divergence[index]) * 0.25f;
+
+            
+            }
+        }
+    }
+    __syncthreads();
+
+    //APPLY BOUNDARY CONDITIONS
+    //x boundaries
+    for(int y = tid_y + 1; y <= small_tile_rows; y += blockDim.y){
+        for(int x = tid_x + 1; x <= small_tile_cols; x += blockDim.x){
+
+            int g_x = x + glob_offset_x - 1;
+            int g_y = y + glob_offset_y - 1;
+
+            if(g_y > 0 && g_y < height - 1){
+
+                if(g_x == 0){
+                    small_tile[y][x] = small_tile[y][x+1];
+                }
+                if(g_x == width - 1){
+                    small_tile[y][x] = small_tile[y][x-1];
+                }
+
+            }
+        }
+    }
+
+    __syncthreads();
+
+    //y boundaries
+
+    for(int y = tid_y + 1; y <= small_tile_rows; y += blockDim.y){
+        for(int x = tid_x + 1; x <= small_tile_cols; x += blockDim.x){
+
+            int g_x = x + glob_offset_x - 1;
+            int g_y = y + glob_offset_y - 1;
+
+            //includes corners
+            if(g_x >= 0 && g_x < width){
+
+                if(g_y == 0){
+                    small_tile[y][x] = small_tile[y+1][x];
+                }
+                if(g_y == height - 1){
+                    small_tile[y][x] = small_tile[y-1][x];
+                }
+
+            }
+        }
+    }
+
+    __syncthreads();
+
+
+
+    //DO SECOND SOLVE
+
+    std::size_t g_x = glob_offset_x + tid_x + 1;
+    std::size_t g_y = glob_offset_y + tid_y + 1;
+    std::size_t index = g_y * width + g_x;
+
+    //OOB check
+
+    if (g_x < width - 1 && g_y < height - 1){
+        
+            std::size_t center_x = tid_x + 2;
+            std::size_t center_y = tid_y + 2;
+        
+            float xl = small_tile[center_y][center_x - 1];
+            float xr = small_tile[center_y][center_x + 1];
+            float yt = small_tile[(center_y - 1)][center_x];
+            float yb = small_tile[(center_y + 1)][center_x];
+            
+            pressure[index] = (xl + xr + yt + yb - divergence[index]) * 0.25f;
+    }
+
+}
+
 
 __global__ void project_kernel(const float *m_pressure, float *m_u_velocity, float *m_v_velocity,
                                std::size_t m_width, std::size_t m_height) {
@@ -549,27 +724,103 @@ void CUDA_simulation::scalar_boundaries(float *field) {
 }
 
 
-void CUDA_simulation::project_step_tiled() {
 
-    //tiled version of our pressure solver
+void CUDA_simulation::project_step_global() {
+    FluidGrid &fluid = env_.fluid_grid;
+    std::size_t width = env_.m_width;
+    std::size_t height = env_.m_height;
+    int threads = 256;
+    int blocks = (width * height + threads - 1) / threads;
+    divergence_kernel<<<blocks, threads>>>(d_u_, 
+        d_v_, 
+        d_divergence_, 
+        width, 
+        height);
+        FLUID_CHECK(cudaGetLastError());
+        
+        // Preserve the CPU pressure warm start, iteration count and final swap.
+        for(std::size_t k = 0; k < fluid.m_pressure_iter; k++) {
+            pressure_kernel<<<blocks, threads>>>(d_pressure_prev_, d_divergence_, d_pressure_, width,
+                height);
+                FLUID_CHECK(cudaGetLastError());
+                pressure_boundaries();
+                std::swap(d_pressure_, d_pressure_prev_);
+            }
+            std::swap(d_pressure_, d_pressure_prev_);
+            pressure_boundaries();
+            
+            project_kernel<<<blocks, threads>>>(d_pressure_, d_u_, d_v_, width, height);
+            FLUID_CHECK(cudaGetLastError());
+            vel_boundaries();
+        }
+
+        void CUDA_simulation::project_step_tiled() {
+        
+            //calc divergence
+            FluidGrid &fluid = env_.fluid_grid;
+            std::size_t width = env_.m_width;
+            std::size_t height = env_.m_height;
+            int threads = 256;
+            int blocks = (width * height + threads - 1) / threads;
+            divergence_kernel<<<blocks, threads>>>(d_u_, 
+                                                    d_v_, 
+                                                    d_divergence_, 
+                                                    width, 
+                                                    height);
+            FLUID_CHECK(cudaGetLastError());
+        
+        
+            dim3 tiled_threads(16,16);
+            dim3 tiled_blocks((m_width-2 + tiled_threads.x - 1)/tiled_threads.x,
+                    (m_height-2 + tiled_threads.y - 1)/tiled_threads.y);
+        
+                    //tile bytes
+            std::size_t shared_bytes = (tiled_threads.x + 2) * (tiled_threads.y + 2) * sizeof(float);
+            //tiled pressure solve
+            for(std::size_t k = 0; k < fluid.m_pressure_iter; k++) {
+                pressure_kernel_tiled<<<tiled_blocks, tiled_threads, shared_bytes>>>(d_pressure_prev_, 
+                                                    d_divergence_, 
+                                                    d_pressure_, 
+                                                    width,
+                                                    height);
+                FLUID_CHECK(cudaGetLastError());
+                pressure_boundaries();
+                std::swap(d_pressure_, d_pressure_prev_);
+            }
+            std::swap(d_pressure_, d_pressure_prev_);
+            pressure_boundaries();
+        
+            project_kernel<<<blocks, threads>>>(d_pressure_, d_u_, d_v_, width, height);
+            FLUID_CHECK(cudaGetLastError());
+            vel_boundaries();
+        }
+
+void CUDA_simulation::project_step_temporal() {
+
+    //calc divergence
     FluidGrid &fluid = env_.fluid_grid;
     std::size_t width = env_.m_width;
     std::size_t height = env_.m_height;
 
-    //16 by 16 threads per block
-    dim3 threads(16,16);
-    //boundary cells are processed seperately so width and height -2
-    dim3 blocks(
-        (width-2 + threads.x-1)/threads.x,
-        (height-2 + threads.y-1)/threads.y
-    )
 
-    divergence_kernel<<<blocks, threads>>>(d_u_, d_v_, d_divergence_, width, height);
+    int threads = 256;
+    int blocks = (width * height + threads - 1) / threads;
+    divergence_kernel<<<blocks, threads>>>(d_u_, 
+                                            d_v_, 
+                                            d_divergence_, 
+                                            width, 
+                                            height);
     FLUID_CHECK(cudaGetLastError());
 
-    // Preserve the CPU pressure warm start, iteration count and final swap.
-    for(std::size_t k = 0; k < fluid.m_pressure_iter; k++) {
-        pressure_kernel_tiled<<<blocks, threads>>>(d_pressure_prev_, 
+    //tiled solver using temporal blocking (multiple iterations with a bigger tile)
+
+    dim3 tiled_threads(16,16);
+    dim3 tiled_blocks((width-2 + tiled_threads.x - 1)/tiled_threads.x,
+            (height-2 + tiled_threads.y - 1)/tiled_threads.y);
+
+    //temporal pressure solve does half as many iterations because it does two iterations at once
+    for(std::size_t k = 0; k < fluid.m_pressure_iter/2; k++) {
+        pressure_kernel_temporal<<<tiled_blocks, tiled_threads>>>(d_pressure_prev_, 
                                             d_divergence_, 
                                             d_pressure_, 
                                             width,
@@ -578,11 +829,15 @@ void CUDA_simulation::project_step_tiled() {
         pressure_boundaries();
         std::swap(d_pressure_, d_pressure_prev_);
     }
+
+
     std::swap(d_pressure_, d_pressure_prev_);
     pressure_boundaries();
 
     project_kernel<<<blocks, threads>>>(d_pressure_, d_u_, d_v_, width, height);
     FLUID_CHECK(cudaGetLastError());
+
+
     vel_boundaries();
 }
 
@@ -677,10 +932,18 @@ void CUDA_simulation::step_fluid(float dt) {
     diffuse_vel(dt);
     vel_boundaries();
 
-    if (config_.pressure == PressureMode::Tiled) {
-        project_step_tiled();
-    } else {
-        project_step_global();
+    switch (config_.pressure) {
+        case PressureMode::Global:
+            project_step_global();
+            break;
+
+        case PressureMode::Tiled:
+            project_step_tiled();
+            break;
+
+        case PressureMode::Temporal:
+            project_step_temporal();
+            break;
     }
 
     for(auto &emitter : fluid.m_emitters) {

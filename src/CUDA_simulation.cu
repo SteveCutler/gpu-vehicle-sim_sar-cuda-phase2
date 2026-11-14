@@ -2297,21 +2297,21 @@ std::size_t CUDA_simulation::runCudaSimulation(
                 this->p_map_.particles_.size()
             );
 
-            switch (config_.hit_mode) {
-            case HitMode::Byte:
-                path_hits();
-                score_paths(vehicles);
-                break;
+            switch (config_.hits) {
+                case HitMode::Byte:
+                    path_hits();
+                    score_paths(vehicles);
+                    break;
 
-            case HitMode::Packed:
-                path_hits_packed();
-                score_paths_packed(vehicles);
-                break;
+                case HitMode::Packed:
+                    path_hits_packed();
+                    score_paths_packed(vehicles);
+                    break;
 
-            case HitMode::Fused:
-                hit_score_fused(vehicles); 
-                break;
-            }
+                case HitMode::Fused:
+                    hit_score_fused(vehicles); 
+                    break;
+                }
 
         }
         

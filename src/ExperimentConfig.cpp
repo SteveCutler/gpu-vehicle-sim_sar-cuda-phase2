@@ -64,17 +64,23 @@ ExperimentConfig loadExperimentConfig(const std::string& path) {
                 config.pressure = PressureMode::Global;
             } else if (value == "tiled") {
                 config.pressure = PressureMode::Tiled;
+            } else if (value == "temporal") {
+                config.pressure = PressureMode::Temporal;
             } else {
                 throw std::runtime_error("Unknown pressure mode: " + value);
             }
+
         } else if (key == "compaction") {
             if (value == "atomic") {
                 config.compaction = CompactionMode::Atomic;
-            } else if (value == "prefix_scan") {
-                config.compaction = CompactionMode::PrefixScan;
+            } else if (value == "prefix_global" || value == "prefix_scan") {
+                config.compaction = CompactionMode::PrefixGlobal;
+            } else if (value == "prefix_shared") {
+                config.compaction = CompactionMode::PrefixShared;
             } else {
                 throw std::runtime_error("Unknown compaction mode: " + value);
             }
+
         } else if (key == "planner") {
             if (value == "repeated") {
                 config.planner = PlannerMode::RepeatedRollout;
@@ -83,6 +89,7 @@ ExperimentConfig loadExperimentConfig(const std::string& path) {
             } else {
                 throw std::runtime_error("Unknown planner mode: " + value);
             }
+
         } else if (key == "use_graph") {
             if (value == "true") {
                 config.use_graph = true;
@@ -91,9 +98,17 @@ ExperimentConfig loadExperimentConfig(const std::string& path) {
             } else {
                 throw std::runtime_error("use_graph must be true or false");
             }
-        } else {
-            throw std::runtime_error("Unknown config key: " + key);
-        }
+
+        } else if (key == "hits") {
+            if (value == "bytes") {
+                config.hits = HitMode::Bytes;
+            } else if (value == "packed") {
+                config.hits = HitMode::Packed;
+            } else if (value == "fused") {
+                config.hits = HitMode::Fused;
+            } else {
+                throw std::runtime_error("Unknown hits mode: " + value);
+            }
     }
 
     return config;
