@@ -467,7 +467,7 @@ __global__ void path_kernel(
     const float* waypoints_x,
     const float* waypoints_y,
     float* vehiclepaths_x,
-    float* vehiclepath_y,
+    float* vehiclepaths_y,
 
     const std::size_t v_count, 
     const float dt,
