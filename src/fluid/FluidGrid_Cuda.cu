@@ -771,8 +771,8 @@ void CUDA_simulation::project_step_global() {
         
         
             dim3 tiled_threads(16,16);
-            dim3 tiled_blocks((m_width-2 + tiled_threads.x - 1)/tiled_threads.x,
-                    (m_height-2 + tiled_threads.y - 1)/tiled_threads.y);
+            dim3 tiled_blocks((width-2 + tiled_threads.x - 1)/tiled_threads.x,
+                    (height-2 + tiled_threads.y - 1)/tiled_threads.y);
         
                     //tile bytes
             std::size_t shared_bytes = (tiled_threads.x + 2) * (tiled_threads.y + 2) * sizeof(float);
@@ -830,43 +830,21 @@ void CUDA_simulation::project_step_temporal() {
         std::swap(d_pressure_, d_pressure_prev_);
     }
 
-
-    std::swap(d_pressure_, d_pressure_prev_);
-    pressure_boundaries();
-
-    project_kernel<<<blocks, threads>>>(d_pressure_, d_u_, d_v_, width, height);
-    FLUID_CHECK(cudaGetLastError());
-
-
-    vel_boundaries();
-}
-
-void CUDA_simulation::project_step_global() {
-    FluidGrid &fluid = env_.fluid_grid;
-    std::size_t width = env_.m_width;
-    std::size_t height = env_.m_height;
-    int threads = 256;
-    int blocks = (width * height + threads - 1) / threads;
-    divergence_kernel<<<blocks, threads>>>(d_u_, 
-                                            d_v_, 
-                                            d_divergence_, 
-                                            width, 
-                                            height);
-    FLUID_CHECK(cudaGetLastError());
-
-    // Preserve the CPU pressure warm start, iteration count and final swap.
-    for(std::size_t k = 0; k < fluid.m_pressure_iter; k++) {
-        pressure_kernel<<<blocks, threads>>>(d_pressure_prev_, d_divergence_, d_pressure_, width,
-                                             height);
+    if(fluid.m_pressure_iter % 2 != 0){
+        pressure_kernel<<<blocks, threads>>>(d_pressure_prev_, d_divergence_, d_pressure_, width, height);
         FLUID_CHECK(cudaGetLastError());
         pressure_boundaries();
         std::swap(d_pressure_, d_pressure_prev_);
     }
+
+
     std::swap(d_pressure_, d_pressure_prev_);
     pressure_boundaries();
 
     project_kernel<<<blocks, threads>>>(d_pressure_, d_u_, d_v_, width, height);
     FLUID_CHECK(cudaGetLastError());
+
+
     vel_boundaries();
 }
 

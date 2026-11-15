@@ -51,11 +51,13 @@ public:
     void calc_occ_maps(std::size_t steps, std::size_t p_count);
     void calc_paths(vehicleBatch& vehicles, std::size_t steps, std::size_t p_count);
     void path_hits();
+    void path_hits_repeated(vehicleBatch& vehicles);
     void score_paths(vehicleBatch& vehicles);
     std::pair<float,float> convert_cell(std::size_t cell);
     void update_particles();
     void particle_cull_atomic();
     void particle_cull_prefix();
+    void particle_cull_prefix_smem();
     void compute_prob_cuda();
     void path_hits_packed();
     void score_paths_packed(vehicleBatch& vehicles);
@@ -77,6 +79,7 @@ public:
  
     void project_step_global();
     void project_step_tiled();
+    void project_step_temporal();
     void add_source(std::size_t x, std::size_t y, float size, Vec3 clr);
     void diffuse(float dt, const float* source, float*& destination);
     void advect_decay(float dt, const float* source, float* dest);
@@ -150,6 +153,7 @@ private:
     std::size_t candidate_waypoints_ = 3;
     unsigned int* d_best_wp = nullptr;
     unsigned int* d_path_scores = nullptr;
+    std::vector<unsigned int> path_scores;
 
     //PARTICLE POINTER VARS
     PredictionParticle* d_particles_ = nullptr;

@@ -109,6 +109,9 @@ ExperimentConfig loadExperimentConfig(const std::string& path) {
             } else {
                 throw std::runtime_error("Unknown hits mode: " + value);
             }
+        } else {
+            throw std::runtime_error("Unknown config key: " + key);
+        }
     }
 
     return config;

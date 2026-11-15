@@ -27,7 +27,7 @@ enum class HitMode {
 struct ExperimentConfig {
     PressureMode pressure = PressureMode::Global;
     CompactionMode compaction = CompactionMode::Atomic;
-    PlannerMode planner = PlannerMode::RepeatedRollout;
+    PlannerMode planner = PlannerMode::PrecomputedPaths;
     HitMode hits = HitMode::Bytes;
     bool use_graph = false;
 };

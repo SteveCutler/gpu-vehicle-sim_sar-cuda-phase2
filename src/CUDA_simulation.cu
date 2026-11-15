@@ -512,15 +512,13 @@ __global__ void path_kernel(
         }
 
         //calculate current offset for vehicle and path output
-        std::size_t path_start = path_idx * (steps + 1);
+        std::size_t path_start = idx * (steps + 1);
         vehiclepaths_x[path_start] = vs.x;
         vehiclepaths_y[path_start] = vs.y;
         
         //for each step calculate new vehicle pos given this waypoint
         //loop starts at 1 to exclude current step
         for(std::size_t s = 1; s <= steps; s++){
-
-            std::size_t offset = (v * wp_num * steps + s) + (v * wp * steps);
 
             //pass vehicle state by reference, this updates to new state
             dynamics_update(vs,
@@ -535,6 +533,48 @@ __global__ void path_kernel(
                 vehiclepaths_y[path_start + s] = vs.y;
         }
     
+}
+
+__global__ void repeated_hit_kernel(
+    const float* vs_x, const float* vs_y,
+    const float* vs_vx, const float* vs_vy,
+    const float* vs_heading, const float* vs_turnRate,
+    const float* vs_goalx, const float* vs_goaly,
+    const float* waypoints_x, const float* waypoints_y,
+    const float* u_prev, const float* v_prev,
+    const PredictionParticle* forecasts, unsigned char* hits,
+    std::size_t p_count, std::size_t wp_count, std::size_t v_count,
+    std::size_t steps, std::size_t width, std::size_t height,
+    float dt, float sensor_rad
+){
+    std::size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if(idx >= p_count) return;
+
+    for(std::size_t v = 0; v < v_count; ++v){
+        for(std::size_t wp = 0; wp < wp_count; ++wp){
+            VehicleState state = {
+                vs_x[v], vs_y[v], vs_vx[v], vs_vy[v],
+                vs_heading[v], vs_turnRate[v], vs_goalx[v], vs_goaly[v]
+            };
+            if(wp != 0){
+                state.goalx = waypoints_x[wp - 1];
+                state.goaly = waypoints_y[wp - 1];
+            }
+
+            unsigned char hit = 0;
+            for(std::size_t s = 1; s <= steps; ++s){
+                dynamics_update(state, controller_update(state), dt,
+                                u_prev, v_prev, height, width);
+                const PredictionParticle& p = forecasts[s * p_count + idx];
+                if(scan_helper(p.pos.x, static_cast<float>(height) - p.pos.y,
+                               state.x, state.y, sensor_rad)){
+                    hit = 1;
+                    break;
+                }
+            }
+            hits[(v * wp_count + wp) * p_count + idx] = hit;
+        }
+    }
 }
 
 __global__ void hit_kernel(
@@ -604,7 +644,7 @@ __global__ void packed_hit_kernel(
     std::size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     std::size_t words_per_path = (p_count + 31) / 32;
     std::size_t word_idx = idx / 32;
-    std::size_T lane = threadIdx.x % 32;
+    std::size_t lane = threadIdx.x % 32;
 
     unsigned int FULL_MASK = 0xFFFFFFFF;
 
@@ -753,7 +793,7 @@ __global__ void score_paths_packed_kernel(
     
     //first loop just fills in the smem, other loops compare
     std::size_t idx = threadIdx.x;
-    std::size_t words_per_path(p_count + 31) / 32
+    std::size_t words_per_path = (p_count + 31) / 32;
     
     //each block has 256 threads and is used to calculate all rollouts for one vehicle
     //
@@ -768,6 +808,7 @@ __global__ void score_paths_packed_kernel(
     int lane_num = idx % 32;
     
     int v = blockIdx.x;
+    unsigned int FULL_MASK = 0xFFFFFFFF;
    
     std::size_t hit_offset;
 
@@ -790,6 +831,10 @@ __global__ void score_paths_packed_kernel(
             
         }        
         
+        for(int offset = 1; offset < 32; offset *= 2){
+            local_hits += __shfl_down_sync(FULL_MASK, local_hits, offset);
+        }
+
         if(lane_num == 0){
             sMem[warp_num] = local_hits;
         }
@@ -800,7 +845,7 @@ __global__ void score_paths_packed_kernel(
             //if lane in bounds for smem, load value, else get 0
             unsigned int warp_total = lane_num < warp_count ? sMem[lane_num] : 0;
             
-            offset = 1;
+            int offset = 1;
             while(offset < 32){
                 warp_total += __shfl_down_sync(FULL_MASK, warp_total, offset);
                 offset *=2;
@@ -820,7 +865,7 @@ __global__ void score_paths_packed_kernel(
     //afterwards tid 0 writes out best_wp to 
     if(idx == 0){
 
-        best_wps[v_num] = best_wp;
+        best_wps[v] = best_wp;
     }
 
 }
@@ -1163,15 +1208,14 @@ __global__ void prefix_kernel(
 
     std::size_t idx = threadIdx.x;
 
-    unsigned int = idx < block_total ? nums[idx] : 0u;
-
+    if(idx >= block_total) nums[idx] = 0u;
     __syncthreads();
     //blelloch upsweep
 
-    offset = 1;
+    int offset = 1;
     int a_i;
     int b_i;
-    for(int x = nums/2; x > 0; x/=2){
+    for(int x = blockDim.x/2; x > 0; x/=2){
 
         if(idx < x){
 
@@ -1195,7 +1239,7 @@ __global__ void prefix_kernel(
     //downsweep
     offset /= 2;
     unsigned int temp;
-    for(int x = 1; x < blockDim.x; x*=2;){
+    for(int x = 1; x < blockDim.x; x*=2){
 
         if(idx < x){
 
@@ -1272,8 +1316,8 @@ void CUDA_simulation::init_simulation(
         CUDA_CHECK(cudaMalloc(&this->vs_goalx, floatBytes));
         CUDA_CHECK(cudaMalloc(&this->vs_goaly, floatBytes));
 
-        CUDA_CHECK(cudaMalloc(&this->d_vehicle_paths_x, v_count * sizeof(float) * this->candidate_waypoints_));
-        CUDA_CHECK(cudaMalloc(&this->d_vehicle_paths_y, v_count * sizeof(float) * this->candidate_waypoints_));
+        CUDA_CHECK(cudaMalloc(&this->d_vehicle_paths_x, v_count_ * steps * sizeof(float) * this->candidate_waypoints_));
+        CUDA_CHECK(cudaMalloc(&this->d_vehicle_paths_y, v_count_ * steps * sizeof(float) * this->candidate_waypoints_));
         
         
         //allocate memory to devices for fluid fields
@@ -1354,11 +1398,11 @@ void CUDA_simulation::init_simulation(
         ));
 
         //packed hit config
-        std::size_t words_per_path = (particle_capacity_ + 31) / 32;
+        std::size_t words_per_path = (p_count + 31) / 32;
         std::size_t path_count = v_count_ * candidate_waypoints_;
         std::size_t packed_bytes = path_count * words_per_path * sizeof(unsigned int);
 
-        CUDA_CHECK(cudaMalloc(&d_packed_hits_, packed_bytes));
+        CUDA_CHECK(cudaMalloc(&d_packed_hits, packed_bytes));
 
 
 }
@@ -1679,8 +1723,8 @@ void CUDA_simulation::calc_paths(
     CUDA_CHECK(cudaMemcpy(this->d_waypoints_x, wp_x.data(), wp_x.size()*sizeof(float), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(this->d_waypoints_y, wp_y.data(), wp_y.size()*sizeof(float), cudaMemcpyHostToDevice));
 
-    std::size_t threads = this->v_count_ * this->candidate_waypoints_;
-    std::size_t blocks = 1;
+    std::size_t threads = 256;
+    std::size_t blocks = (v_count_ * candidate_waypoints_ + threads - 1) / threads;
 
 
     //current goals are being passed in as part of vehicle state
@@ -1718,10 +1762,34 @@ void CUDA_simulation::calc_paths(
 
 }
 
+void CUDA_simulation::path_hits_repeated(vehicleBatch& vehicles){
+    std::size_t p_count = p_map_.particles_.size();
+    if(p_count == 0 || v_count_ == 0) return;
+
+    HtD_vehicles(vehicles);
+    std::vector<float> wp_x(candidate_waypoints_ - 1);
+    std::vector<float> wp_y(candidate_waypoints_ - 1);
+    for(std::size_t i = 1; i < candidate_waypoints_; ++i){
+        wp_x[i - 1] = planner_.wayPoints[i].first;
+        wp_y[i - 1] = planner_.wayPoints[i].second;
+    }
+    CUDA_CHECK(cudaMemcpy(d_waypoints_x, wp_x.data(), wp_x.size() * sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_waypoints_y, wp_y.data(), wp_y.size() * sizeof(float), cudaMemcpyHostToDevice));
+
+    std::size_t threads = 256;
+    std::size_t blocks = (p_count + threads - 1) / threads;
+    repeated_hit_kernel<<<blocks, threads>>>(
+        vs_x, vs_y, vs_vx, vs_vy, vs_heading, vs_turnRate, vs_goalx, vs_goaly,
+        d_waypoints_x, d_waypoints_y, d_u_prev_, d_v_prev_, d_p_horizons,
+        d_hit_map, p_count, candidate_waypoints_, v_count_, planner_.horizon_,
+        env_.m_width, env_.m_height, dt_, sensor_radius_);
+    CUDA_CHECK(cudaGetLastError());
+}
+
 void CUDA_simulation::path_hits(){
 
     std::size_t p_count = this->p_map_.particles_.size();
-    std::size_t steps = this->planner_.horizon_ + 1;
+    std::size_t steps = this->planner_.horizon_;
 
     std::size_t threads = 256;
     std::size_t blocks = (p_count + threads - 1)/threads;
@@ -1733,7 +1801,7 @@ void CUDA_simulation::path_hits(){
         this->d_hit_map,
         p_count,
         this->candidate_waypoints_,
-        this->v_count,
+        this->v_count_,
         steps,
         this->env_.m_height,
         this->sensor_radius_
@@ -1746,7 +1814,7 @@ void CUDA_simulation::path_hits(){
 void CUDA_simulation::path_hits_packed(){
 
     std::size_t p_count = this->p_map_.particles_.size();
-    std::size_t steps = this->planner_.horizon_ + 1;
+    std::size_t steps = this->planner_.horizon_;
 
     std::size_t threads = 256;
     std::size_t blocks = (p_count + threads - 1)/threads;
@@ -1758,7 +1826,7 @@ void CUDA_simulation::path_hits_packed(){
         this->d_packed_hits,
         p_count,
         this->candidate_waypoints_,
-        this->v_count,
+        this->v_count_,
         steps,
         this->env_.m_height,
         this->sensor_radius_
@@ -1931,15 +1999,15 @@ void CUDA_simulation::hit_score_fused(vehicleBatch& vehicles){
         //sync vehicle goals up to GPU
         CUDA_CHECK(cudaMemcpy(
             this->vs_goalx,
-            vehicles.m_goalx,
-            v_count_ * sizeof(unsigned int),
+            vehicles.m_goalx.data(),
+            v_count_ * sizeof(float),
             cudaMemcpyHostToDevice
         ));
         
         CUDA_CHECK(cudaMemcpy(
             this->vs_goaly,
-            vehicles.m_goaly,
-            v_count_ * sizeof(unsigned int),
+            vehicles.m_goaly.data(),
+            v_count_ * sizeof(float),
             cudaMemcpyHostToDevice
         ));
 
@@ -2025,18 +2093,18 @@ void CUDA_simulation::particle_cull_prefix(){
     prefix_kernel<<<1,prefix_threads>>>(d_local_totals, blocks, d_remainder);
     CUDA_CHECK(cudaGetLastError());
 
-    cudaMemcpy(&remainder, 
-        d_remainder, 
-        sizeof(unsigned int), 
-        cudaMemcpyDeviceToHost);
+    CUDA_CHECK(cudaMemcpy(&remainder,
+        d_remainder,
+        sizeof(unsigned int),
+        cudaMemcpyDeviceToHost));
 
     //3 apply block totals to local block values, scatter particles in result vector
     //write out vector, resize new vector, swap it with old particle vector
     //
 
         p_cull_sum_scatter<<<blocks, threads>>>(
-        this->d_particles,
-        this->d_particle_buffer,
+        this->d_particles_,
+        this->d_particle_buffer_,
         this->d_remove_particles_,
         this->d_dead_prefix,
         this->d_local_totals,
@@ -2050,12 +2118,12 @@ void CUDA_simulation::particle_cull_prefix(){
 
     //copy survivors
     CUDA_CHECK(cudaMemcpy(p_map_.particles_.data(),
-    d_particle_buffer,
+    d_particle_buffer_,
     survivors * sizeof(PredictionParticle),
     cudaMemcpyDeviceToHost
     ));
 
-    std::swap(d_particles, d_particle_buffer);
+    std::swap(d_particles_, d_particle_buffer_);
 
 
 };
@@ -2073,12 +2141,12 @@ void CUDA_simulation::particle_cull_prefix_smem(){
     std::size_t threads = 256;
     std::size_t blocks = (p_count + threads - 1)/threads;
 
-    //return for local totals
-    std::vector<unsigned int> local_totals(blocks);
-    CUDA_CHECK(cudaMalloc(&this->d_local_totals, blocks*sizeof(unsigned int)));
-    CUDA_CHECK(cudaMemset(d_local_totals, 0, blocks*sizeof(unsigned int)));
-    
-    CUDA_CHECK(cudaMalloc(&this->d_dead_prefix, blocks*threads*sizeof(unsigned int)));
+    // Scan buffers were allocated for the maximum particle count in init_simulation.
+    std::size_t prefix_threads = 1;
+    while(prefix_threads < blocks){
+        prefix_threads *= 2;
+    }
+    CUDA_CHECK(cudaMemset(d_local_totals, 0, prefix_threads*sizeof(unsigned int)));
     CUDA_CHECK(cudaMemset(d_dead_prefix, 0, blocks*threads*sizeof(unsigned int)));
 
     std::size_t shared_bytes = threads * sizeof(unsigned int);
@@ -2099,30 +2167,24 @@ void CUDA_simulation::particle_cull_prefix_smem(){
     
     
     //get threads that are multiples of 2
-    std::size_t prefix_threads = 1;
-    while(prefix_threads < blocks){
-        prefix_threads *=2;
-    }
-    CUDA_CHECK(cudaMalloc(&this->d_local_totals, prefix_threads*sizeof(unsigned int)));
-
     unsigned int remainder;
     CUDA_CHECK(cudaMemset(d_remainder, 0, sizeof(unsigned int)));
 
     prefix_kernel<<<1,prefix_threads>>>(d_local_totals, blocks, d_remainder);
     CUDA_CHECK(cudaGetLastError());
 
-    cudaMemcpy(&remainder, 
-        d_remainder, 
-        sizeof(unsigned int), 
-        cudaMemcpyDeviceToHost);
+    CUDA_CHECK(cudaMemcpy(&remainder,
+        d_remainder,
+        sizeof(unsigned int),
+        cudaMemcpyDeviceToHost));
 
     //3 apply block totals to local block values, scatter particles in result vector
     //write out vector, resize new vector, swap it with old particle vector
     //
 
         p_cull_sum_scatter<<<blocks, threads>>>(
-        this->d_particles,
-        this->d_particle_buffer,
+        this->d_particles_,
+        this->d_particle_buffer_,
         this->d_remove_particles_,
         this->d_dead_prefix,
         this->d_local_totals,
@@ -2136,12 +2198,12 @@ void CUDA_simulation::particle_cull_prefix_smem(){
 
     //copy survivors
     CUDA_CHECK(cudaMemcpy(p_map_.particles_.data(),
-    d_particle_buffer,
+    d_particle_buffer_,
     survivors * sizeof(PredictionParticle),
     cudaMemcpyDeviceToHost
     ));
 
-    std::swap(d_particles, d_particle_buffer);
+    std::swap(d_particles_, d_particle_buffer_);
 
 };
 
@@ -2291,27 +2353,31 @@ std::size_t CUDA_simulation::runCudaSimulation(
 
             find_waypoints();
 
-            calc_paths(
-                vehicles,
-                this->planner_.horizon_,
-                this->p_map_.particles_.size()
-            );
-
-            switch (config_.hits) {
-                case HitMode::Byte:
-                    path_hits();
-                    score_paths(vehicles);
-                    break;
-
-                case HitMode::Packed:
-                    path_hits_packed();
-                    score_paths_packed(vehicles);
-                    break;
-
-                case HitMode::Fused:
-                    hit_score_fused(vehicles); 
-                    break;
+            if(config_.planner == PlannerMode::RepeatedRollout){
+                if(config_.hits != HitMode::Bytes){
+                    throw std::runtime_error("Repeated rollout requires hits=bytes");
                 }
+                path_hits_repeated(vehicles);
+                score_paths(vehicles);
+            }else{
+                calc_paths(vehicles, planner_.horizon_, p_map_.particles_.size());
+
+                switch (config_.hits) {
+                    case HitMode::Bytes:
+                        path_hits();
+                        score_paths(vehicles);
+                        break;
+
+                    case HitMode::Packed:
+                        path_hits_packed();
+                        score_paths_packed(vehicles);
+                        break;
+
+                    case HitMode::Fused:
+                        hit_score_fused(vehicles);
+                        break;
+                }
+            }
 
         }
         
@@ -2380,12 +2446,16 @@ CUDA_simulation::~CUDA_simulation(){
     cudaFree(d_p_horizons);
     cudaFree(d_hit_map);
     cudaFree(d_local_totals);
-    cudaFree(d_dead_prefix;)
+    cudaFree(d_dead_prefix);
     cudaFree(d_occupancy_maps_);
     cudaFree(d_occupancy_map);
     cudaFree(d_waypoints_x);
     cudaFree(d_waypoints_y);
     cudaFree(d_best_wp);
+    cudaFree(d_path_scores);
+    cudaFree(d_packed_hits);
+    cudaFree(d_vehicle_paths_x);
+    cudaFree(d_vehicle_paths_y);
 
     
 }
