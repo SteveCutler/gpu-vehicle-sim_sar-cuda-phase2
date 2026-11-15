@@ -912,6 +912,7 @@ void CUDA_simulation::step_fluid(float dt) {
     diffuse_vel(dt);
     vel_boundaries();
 
+    FLUID_CHECK(cudaEventRecord(pressure_start_));
     switch (config_.pressure) {
         case PressureMode::Global:
             project_step_global();
@@ -925,6 +926,13 @@ void CUDA_simulation::step_fluid(float dt) {
             project_step_temporal();
             break;
     }
+
+    FLUID_CHECK(cudaEventRecord(pressure_stop_));
+    FLUID_CHECK(cudaEventSynchronize(pressure_stop_));
+    float pressure_ms = 0.f;
+    FLUID_CHECK(cudaEventElapsedTime(&pressure_ms, pressure_start_, pressure_stop_));
+    pressure_gpu_ms_ += pressure_ms;
+    ++pressure_samples_;
 
     for(auto &emitter : fluid.m_emitters) {
         add_source(emitter->m_pos.x, emitter->m_pos.y, emitter->m_rad, emitter->m_clr);

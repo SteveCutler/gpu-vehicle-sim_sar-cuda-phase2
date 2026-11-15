@@ -1284,6 +1284,8 @@ __global__ void p_cull_sum_scatter(
 
 void CUDA_simulation::init_simulation( 
     vehicleBatch& vehicles){
+       CUDA_CHECK(cudaEventCreate(&pressure_start_));
+       CUDA_CHECK(cudaEventCreate(&pressure_stop_));
         
         //init cel count
        // this->cell_count_ = cell_count;
@@ -2408,6 +2410,8 @@ std::size_t CUDA_simulation::runCudaSimulation(
 };
 
 CUDA_simulation::~CUDA_simulation(){
+    if(pressure_start_) cudaEventDestroy(pressure_start_);
+    if(pressure_stop_) cudaEventDestroy(pressure_stop_);
         //free allocated memory
     float* allocations[] = {
         vs_x, 

@@ -248,6 +248,12 @@ int main(int argNum, char* argVals[]){
         std::cout << "Vehicles: " << N << '\n';
         std::cout << "Completed steps: " << curr_step << '\n';
         std::cout << "Execution time: " << seconds << " seconds\n";
+        #ifdef ENABLE_CUDA
+        if(useCuda){
+            std::cout << "Pressure GPU ms: " << CudaSim.pressure_gpu_ms() << '\n';
+            std::cout << "Pressure samples: " << CudaSim.pressure_samples() << '\n';
+        }
+        #endif
         std::cout << "Vehicle updates/sec: " << updates / seconds << '\n';
 
             //output file name for correctness comparison

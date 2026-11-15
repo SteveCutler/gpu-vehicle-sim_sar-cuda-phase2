@@ -39,6 +39,8 @@ public:
     ~CUDA_simulation();
 
     std::size_t runCudaSimulation(vehicleBatch& vehicles, std::size_t steps);
+    double pressure_gpu_ms() const { return pressure_gpu_ms_; }
+    std::size_t pressure_samples() const { return pressure_samples_; }
     void init_simulation(vehicleBatch& vehicles);
     void HtD_vehicles(const vehicleBatch& vehicles);
     void DtH_vehicles(vehicleBatch& vehicles);
@@ -104,6 +106,10 @@ public:
 
 
 private:
+    cudaEvent_t pressure_start_ = nullptr;
+    cudaEvent_t pressure_stop_ = nullptr;
+    double pressure_gpu_ms_ = 0.0;
+    std::size_t pressure_samples_ = 0;
 
 
 
