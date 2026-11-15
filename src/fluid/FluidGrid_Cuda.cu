@@ -819,7 +819,8 @@ void CUDA_simulation::project_step_temporal() {
             (height-2 + tiled_threads.y - 1)/tiled_threads.y);
 
     //temporal pressure solve does half as many iterations because it does two iterations at once
-    for(std::size_t k = 0; k < fluid.m_pressure_iter/2; k++) {
+    //subtract 1 and then perform 2 regular 
+    for(std::size_t k = 0; k < (fluid.m_pressure_iter - 1) / 2; k++) {
         pressure_kernel_temporal<<<tiled_blocks, tiled_threads>>>(d_pressure_prev_, 
                                             d_divergence_, 
                                             d_pressure_, 
@@ -830,8 +831,9 @@ void CUDA_simulation::project_step_temporal() {
         std::swap(d_pressure_, d_pressure_prev_);
     }
 
-    if(fluid.m_pressure_iter % 2 != 0){
-        pressure_kernel<<<blocks, threads>>>(d_pressure_prev_, d_divergence_, d_pressure_, width, height);
+    for (std::size_t k = 0; k < 2; k++) {
+        pressure_kernel<<<blocks, threads>>>(
+            d_pressure_prev_, d_divergence_, d_pressure_, width, height);
         FLUID_CHECK(cudaGetLastError());
         pressure_boundaries();
         std::swap(d_pressure_, d_pressure_prev_);
